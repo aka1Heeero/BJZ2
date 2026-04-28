@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import gspread
+from io import StringIO
 from google.oauth2.service_account import Credentials
 
 # ─── 페이지 설정 ───────────────────────────────────────────────
@@ -383,7 +384,7 @@ def build_table(_df_json, months_tuple, col_map):
     캐싱을 위해 df를 JSON 문자열로, months를 tuple로 받음.
     col_map은 컬럼명 매핑 dict.
     """
-    df = pd.read_json(_df_json, dtype=str)
+    df = pd.read_json(StringIO(_df_json), dtype=str)
     months = list(months_tuple)
 
     month_ths = []
