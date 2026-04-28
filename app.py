@@ -71,7 +71,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ─── 로컬 CSV 로드 ────────────────────────────────────────────────
-DATA_FILE = "BJZ.csv"
+DATA_FILE = "BJZ_utf8.csv"
 
 @st.cache_data
 def load_data():
