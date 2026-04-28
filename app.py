@@ -12,6 +12,31 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# ─── 로그인 ────────────────────────────────────────────────────
+def check_password():
+    """비밀번호 인증. secrets에 app_password 설정 필요."""
+    if "authenticated" not in st.session_state:
+        st.session_state["authenticated"] = False
+
+    if st.session_state["authenticated"]:
+        return True
+
+    st.markdown("<h2 style='text-align:center;margin-top:80px'>🔒 발주관리표2</h2>",
+                unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        pw = st.text_input("비밀번호를 입력하세요", type="password", key="pw_input")
+        if st.button("로그인", use_container_width=True):
+            if pw == st.secrets.get("app_password", ""):
+                st.session_state["authenticated"] = True
+                st.rerun()
+            else:
+                st.error("비밀번호가 틀렸습니다.")
+    return False
+
+if not check_password():
+    st.stop()
+
 # ─── CSS ───────────────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -121,7 +146,7 @@ st.markdown("""
 # ─── Google Sheets 연결 ──────────────────────────────────────────
 SHEET_ID = "1MZrzRkcbA7tcF8GiP5iQGOAWRtwfxyL3-_4h2-2k76o"
 
-@st.cache_resource(ttl=300)
+@st.cache_resource(ttl=3600)
 def get_gsheet_client():
     scope = [
         "https://www.googleapis.com/auth/spreadsheets.readonly",
@@ -132,7 +157,7 @@ def get_gsheet_client():
     return gspread.authorize(creds)
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=3600)
 def load_data():
     """
     구글 시트 구조:
@@ -302,6 +327,9 @@ col_SN금액   = get_col(df_raw, "금액")
 
 
 # ─── 필터 UI ────────────────────────────────────────────────────
+# 0행: 품번 검색
+sel_품번검색 = st.text_input("🔎 품번 검색", placeholder="품번 입력 (부분 검색 가능)")
+
 # 1행: 대분류, 중분류, 소분류
 fc1, fc2, fc3 = st.columns(3)
 
@@ -347,6 +375,9 @@ st.markdown("---")
 
 if do_search:
     df = df_raw
+    # 품번 검색
+    if sel_품번검색.strip() and col_품번:
+        df = df[df[col_품번].str.contains(sel_품번검색.strip(), case=False, na=False)]
     if sel_대분류 != "전체" and col_대분류:
         df = df[df[col_대분류] == sel_대분류]
     if sel_중분류 != "전체" and col_중분류:
@@ -378,7 +409,7 @@ if df.empty:
 
 
 # ─── 테이블 HTML 생성 ────────────────────────────────────────────
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=3600)
 def build_table(_df_json, months_tuple, col_map):
     """
     캐싱을 위해 df를 JSON 문자열로, months를 tuple로 받음.
@@ -546,14 +577,41 @@ def build_table(_df_json, months_tuple, col_map):
 
 
 # ─── 렌더링 ─────────────────────────────────────────────────────
-col_map = {
-    "품명": col_품명, "품번": col_품번, "상태": col_상태,
-    "발주주체": col_발주주체, "발주구분": col_발주구분,
-    "판매가": col_판매가, "구입가": col_구입가,
-    "미입고": col_미입고, "입고예정": col_입고예정,
-    "정상재고": col_정상재고, "일출고량": col_일출고량,
-    "SN통화": col_SN통화, "SN금액": col_SN금액,
-    "사진주소": col_사진주소,
-}
-table_html = build_table(df.to_json(), tuple(sel_months), col_map)
-st.markdown(table_html, unsafe_allow_html=True)
+# 사진 미리보기 + 테이블을 좌우 배치
+preview_col, table_col = st.columns([1, 5])
+
+with preview_col:
+    st.markdown("**📷 상품 사진**")
+    if col_품번 and col_사진주소:
+        품번_list = df[col_품번].tolist()
+        품명_list = df[col_품명].tolist() if col_품명 else [""] * len(품번_list)
+        선택옵션 = [f"{p} | {n}" for p, n in zip(품번_list, 품명_list)]
+        if 선택옵션:
+            sel_idx = st.selectbox("상품 선택", range(len(선택옵션)),
+                                   format_func=lambda i: 선택옵션[i],
+                                   label_visibility="collapsed")
+            사진url = str(df.iloc[sel_idx][col_사진주소]).strip() if col_사진주소 else ""
+            sel_품번_val = 품번_list[sel_idx]
+            sel_품명_val = 품명_list[sel_idx]
+            st.markdown(f"**{sel_품번_val}**")
+            st.markdown(f"<span style='font-size:11px;color:#666'>{sel_품명_val}</span>",
+                        unsafe_allow_html=True)
+            if 사진url.startswith("http"):
+                st.image(사진url, use_container_width=True)
+            else:
+                st.info("사진 없음")
+    else:
+        st.info("사진 정보 없음")
+
+with table_col:
+    col_map = {
+        "품명": col_품명, "품번": col_품번, "상태": col_상태,
+        "발주주체": col_발주주체, "발주구분": col_발주구분,
+        "판매가": col_판매가, "구입가": col_구입가,
+        "미입고": col_미입고, "입고예정": col_입고예정,
+        "정상재고": col_정상재고, "일출고량": col_일출고량,
+        "SN통화": col_SN통화, "SN금액": col_SN금액,
+        "사진주소": col_사진주소,
+    }
+    table_html = build_table(df.to_json(), tuple(sel_months), col_map)
+    st.markdown(table_html, unsafe_allow_html=True)
