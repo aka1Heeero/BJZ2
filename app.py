@@ -325,7 +325,7 @@ with fc2:
     sel_중분류 = st.selectbox("중분류", opts_중)
 
 with fc3:
-    df_f2 = df_raw.copy()
+    df_f2 = df_raw
     if sel_대분류 != "전체" and col_대분류:
         df_f2 = df_f2[df_f2[col_대분류] == sel_대분류]
     if sel_중분류 != "전체" and col_중분류:
@@ -348,33 +348,6 @@ with fc6:
     opts_업체 = ["전체"] + unique_vals(df_raw, col_업체명)
     sel_업체 = st.selectbox("업체", opts_업체)
 
-# 조회 버튼
-_, btn_col, _ = st.columns([3, 1, 3])
-with btn_col:
-    st.button("🔍 조회", use_container_width=True)
-
-st.markdown("---")
-
-
-# ─── 필터 적용 ──────────────────────────────────────────────────
-df = df_raw.copy()
-
-if sel_대분류 != "전체" and col_대분류:
-    df = df[df[col_대분류] == sel_대분류]
-if sel_중분류 != "전체" and col_중분류:
-    df = df[df[col_중분류] == sel_중분류]
-if sel_소분류 != "전체" and col_소분류:
-    df = df[df[col_소분류] == sel_소분류]
-if sel_담당 != "전체" and col_담당:
-    df = df[df[col_담당] == sel_담당]
-if sel_관계사팀 != "전체" and col_관계사팀:
-    df = df[df[col_관계사팀] == sel_관계사팀]
-if sel_업체 != "전체" and col_업체명:
-    df = df[df[col_업체명] == sel_업체]
-
-df = df.reset_index(drop=True)
-
-
 # ─── 월 범위 선택 ────────────────────────────────────────────────
 with st.expander("📅 조회 월 범위 선택", expanded=False):
     mc1, mc2 = st.columns(2)
@@ -389,6 +362,39 @@ if si > ei:
     si, ei = ei, si
 sel_months = ALL_MONTHS[si: ei + 1]
 
+# 조회 버튼 — 누를 때만 필터 결과를 session_state에 저장
+_, btn_col, _ = st.columns([3, 1, 3])
+with btn_col:
+    do_search = st.button("🔍 조회", use_container_width=True)
+
+st.markdown("---")
+
+if do_search:
+    df = df_raw
+    if sel_대분류 != "전체" and col_대분류:
+        df = df[df[col_대분류] == sel_대분류]
+    if sel_중분류 != "전체" and col_중분류:
+        df = df[df[col_중분류] == sel_중분류]
+    if sel_소분류 != "전체" and col_소분류:
+        df = df[df[col_소분류] == sel_소분류]
+    if sel_담당 != "전체" and col_담당:
+        df = df[df[col_담당] == sel_담당]
+    if sel_관계사팀 != "전체" and col_관계사팀:
+        df = df[df[col_관계사팀] == sel_관계사팀]
+    if sel_업체 != "전체" and col_업체명:
+        df = df[df[col_업체명] == sel_업체]
+    df = df.reset_index(drop=True)
+    st.session_state["filtered_df"] = df
+    st.session_state["filtered_months"] = list(sel_months)
+
+# 이전 조회 결과가 있으면 표시, 없으면 안내
+if "filtered_df" not in st.session_state:
+    st.info("필터를 선택한 후 🔍 조회 버튼을 눌러주세요.")
+    st.stop()
+
+df = st.session_state["filtered_df"]
+sel_months = st.session_state["filtered_months"]
+
 st.markdown(f"**조회 결과: 총 {len(df)}개 상품**")
 
 if df.empty:
@@ -397,21 +403,19 @@ if df.empty:
 
 
 # ─── 테이블 HTML 생성 ────────────────────────────────────────────
-def build_table(df, months):
+@st.cache_data(ttl=300)
+def build_table(_df_json, months_tuple, col_map):
     """
-    헤더 구조:
-      1행: 순번 | 사진 | 발주구분/상태 | 품번 | 품명 | 판매가 | S/N단가(colspan=2) |
-           가용재고 | 일평균출고 | 발주미입고 | 상태정보 | 구분 | 합계 | [월1] [월2] ...
-      2행:                                              통화  | 금액  (S/N단가 하위)
-      → rowspan="2" 컬럼들은 1행에만, 월별 th도 1행에 rowspan="2"로 배치
-        S/N단가는 colspan="2"이고 2행에 통화/금액 배치
+    캐싱을 위해 df를 JSON 문자열로, months를 tuple로 받음.
+    col_map은 컬럼명 매핑 dict.
     """
-    # 1행 고정 헤더 컬럼 수 (rowspan=2): 순번,사진,발주구분,품번,품명,판매가,가용재고,일평균출고,발주미입고,상태정보,구분,합계 = 12개
-    # S/N단가는 colspan=2 (통화+금액)
-    month_ths_row1 = "".join(
-        f'<th rowspan="2" style="min-width:44px;text-align:center">{m}</th>'
-        for m in months
-    )
+    df = pd.read_json(_df_json, dtype=str)
+    months = list(months_tuple)
+
+    month_ths = []
+    for m in months:
+        month_ths.append(f'<th rowspan="2" style="min-width:44px;text-align:center">{m}</th>')
+    month_ths_row1 = "".join(month_ths)
 
     header = f"""
     <thead>
@@ -437,29 +441,52 @@ def build_table(df, months):
     </thead>
     """
 
-    rows = ""
-    for idx, (_, row) in enumerate(df.iterrows()):
-        품명     = str(row[col_품명]     if col_품명     else "")
-        품번     = str(row[col_품번]     if col_품번     else "")
-        상태     = str(row[col_상태]     if col_상태     else "")
-        발주주체 = str(row[col_발주주체] if col_발주주체 else "")
-        발주구분 = str(row[col_발주구분] if col_발주구분 else "")
-        판매가   = str(row[col_판매가]   if col_판매가   else "")
-        구입가   = str(row[col_구입가]   if col_구입가   else "")
-        미입고   = safe_int(row[col_미입고]   if col_미입고   else 0)
-        입고예정 = str(row[col_입고예정] if col_입고예정 else "")
-        정상재고 = safe_int(row[col_정상재고] if col_정상재고 else 0)
-        일출고   = safe_int(row[col_일출고량] if col_일출고량 else 0)
-        sn_통화  = str(row[col_SN통화]   if col_SN통화   else "")
-        sn_금액  = safe_int(row[col_SN금액] if col_SN금액 else 0)
-        사진주소 = str(row[col_사진주소] if col_사진주소 else "").strip()
+    # 컬럼 매핑 로컬 변수
+    c_품명 = col_map.get("품명")
+    c_품번 = col_map.get("품번")
+    c_상태 = col_map.get("상태")
+    c_발주주체 = col_map.get("발주주체")
+    c_발주구분 = col_map.get("발주구분")
+    c_판매가 = col_map.get("판매가")
+    c_구입가 = col_map.get("구입가")
+    c_미입고 = col_map.get("미입고")
+    c_입고예정 = col_map.get("입고예정")
+    c_정상재고 = col_map.get("정상재고")
+    c_일출고량 = col_map.get("일출고량")
+    c_SN통화 = col_map.get("SN통화")
+    c_SN금액 = col_map.get("SN금액")
+    c_사진주소 = col_map.get("사진주소")
 
-        # 상태 배지
-        badge_map = {"신상품": "신상품", "단종대기": "단종대기", "정상": "정상"}
+    badge_map = {"신상품": "신상품", "단종대기": "단종대기", "정상": "정상"}
+    rs = len(ROW_TYPES)
+    row_parts = []
+
+    # 월별 컬럼 존재 여부를 미리 계산
+    month_cols = {}
+    for rt in ROW_TYPES:
+        month_cols[rt] = {m: f"{rt}_{m}" for m in months}
+
+    df_cols_set = set(df.columns)
+
+    for idx, (_, row) in enumerate(df.iterrows()):
+        품명     = str(row[c_품명])     if c_품명     else ""
+        품번     = str(row[c_품번])     if c_품번     else ""
+        상태     = str(row[c_상태])     if c_상태     else ""
+        발주주체 = str(row[c_발주주체]) if c_발주주체 else ""
+        발주구분 = str(row[c_발주구분]) if c_발주구분 else ""
+        판매가   = str(row[c_판매가])   if c_판매가   else ""
+        구입가   = str(row[c_구입가])   if c_구입가   else ""
+        미입고_v = safe_int(row[c_미입고])   if c_미입고   else 0
+        입고예정 = str(row[c_입고예정]) if c_입고예정 else ""
+        정상재고 = safe_int(row[c_정상재고]) if c_정상재고 else 0
+        일출고   = safe_int(row[c_일출고량]) if c_일출고량 else 0
+        sn_통화  = str(row[c_SN통화])   if c_SN통화   else ""
+        sn_금액  = safe_int(row[c_SN금액]) if c_SN금액 else 0
+        사진주소 = str(row[c_사진주소]).strip() if c_사진주소 else ""
+
         badge_cls = badge_map.get(상태, "기타")
         badge_html = f'<span class="st-badge {badge_cls}">{상태}</span>'
 
-        # 사진 — img 태그로 자동 표시
         if 사진주소.startswith("http"):
             img_html = (
                 f'<img src="{사진주소}" '
@@ -467,76 +494,91 @@ def build_table(df, months):
                 f'alt="{품번}" />'
             )
         else:
-            img_html = '<span style="color:#ccc;font-size:18px">�</span>'
+            img_html = '<span style="color:#ccc;font-size:18px">📷</span>'
 
-        rs = len(ROW_TYPES)
         seq = idx + 1
+
+        # 첫 행 공통 셀 (한 번만 생성)
+        first_cells = (
+            f'<td class="center" rowspan="{rs}">{seq}</td>'
+            f'<td class="img-cell" rowspan="{rs}">{img_html}</td>'
+            f'<td class="center" rowspan="{rs}">{badge_html}<br><small style="color:#666">{발주구분}</small></td>'
+            f'<td class="center" rowspan="{rs}" style="font-family:monospace;font-size:10px">{품번}</td>'
+            f'<td class="left"   rowspan="{rs}" style="font-size:10px">{품명}</td>'
+            f'<td class="num"    rowspan="{rs}">{fmt_num(safe_int(판매가))}</td>'
+            f'<td class="center" rowspan="{rs}" style="font-size:10px">{sn_통화}</td>'
+            f'<td class="num"    rowspan="{rs}">{fmt_num(sn_금액)}</td>'
+            f'<td class="num"    rowspan="{rs}">{fmt_num(정상재고)}</td>'
+            f'<td class="num"    rowspan="{rs}">{fmt_num(일출고)}</td>'
+            f'<td class="num"    rowspan="{rs}">{fmt_num(미입고_v)}</td>'
+            f'<td class="left"   rowspan="{rs}" style="font-size:10px">{입고예정}</td>'
+        )
 
         for ri, rt in enumerate(ROW_TYPES):
             is_first = ri == 0
             is_pos   = rt == "POS판매"
-            tr_cls   = []
+            tr_cls = ""
+            if is_first and is_pos:
+                tr_cls = ' class="prod-first row-pos"'
+            elif is_first:
+                tr_cls = ' class="prod-first"'
+            elif is_pos:
+                tr_cls = ' class="row-pos"'
+
+            parts = []
             if is_first:
-                tr_cls.append("prod-first")
-            if is_pos:
-                tr_cls.append("row-pos")
-            tr_attr = f' class="{" ".join(tr_cls)}"' if tr_cls else ""
+                parts.append(first_cells)
 
-            cells = ""
-            if is_first:
-                cells += f'<td class="center" rowspan="{rs}">{seq}</td>'
-                cells += f'<td class="img-cell" rowspan="{rs}">{img_html}</td>'
-                cells += f'<td class="center" rowspan="{rs}">{badge_html}<br><small style="color:#666">{발주구분}</small></td>'
-                cells += f'<td class="center" rowspan="{rs}" style="font-family:monospace;font-size:10px">{품번}</td>'
-                cells += f'<td class="left"   rowspan="{rs}" style="font-size:10px">{품명}</td>'
-                cells += f'<td class="num"    rowspan="{rs}">{fmt_num(safe_int(판매가))}</td>'
-                cells += f'<td class="center" rowspan="{rs}" style="font-size:10px">{sn_통화}</td>'
-                cells += f'<td class="num"    rowspan="{rs}">{fmt_num(sn_금액)}</td>'
-                cells += f'<td class="num"    rowspan="{rs}">{fmt_num(정상재고)}</td>'
-                cells += f'<td class="num"    rowspan="{rs}">{fmt_num(일출고)}</td>'
-                cells += f'<td class="num"    rowspan="{rs}">{fmt_num(미입고)}</td>'
-                cells += f'<td class="left"   rowspan="{rs}" style="font-size:10px">{입고예정}</td>'
+            parts.append(f'<td class="type-label">{rt}</td>')
 
-            # 구분 라벨
-            cells += f'<td class="type-label">{rt}</td>'
-
-            # 월별 값
+            mc = month_cols[rt]
             for m in months:
-                v = get_monthly_val(row, rt, m)
-                cells += f'<td class="num {"zero-val" if v == 0 else ""}">{fmt_num(v)}</td>'
+                col_name = mc[m]
+                if col_name in df_cols_set:
+                    v = safe_int(row[col_name])
+                else:
+                    v = 0
+                if v == 0:
+                    parts.append('<td class="num zero-val">0</td>')
+                else:
+                    parts.append(f'<td class="num">{v:,}</td>')
 
-            rows += f"<tr{tr_attr}>{cells}</tr>\n"
+            row_parts.append(f"<tr{tr_cls}>{''.join(parts)}</tr>")
 
         # 발주주체 행
-        empty_month_tds = "".join("<td></td>" for _ in months)
-        rows += (
+        empty_month_tds = '<td></td>' * len(months)
+        row_parts.append(
             f'<tr class="owner-row">'
-            f'<td></td>'                                              # 순번
-            f'<td></td>'                                              # 사진
-            f'<td colspan="2" style="padding-left:6px">{발주주체}</td>'  # 상태+품번
-            f'<td class="left" style="font-size:10px">{품명[:15]}</td>'  # 품명
-            f'<td class="num">{fmt_num(safe_int(구입가))}</td>'       # 구입가
-            f'<td></td><td></td>'                                     # S/N단가
-            f'<td></td><td></td>'                                     # 가용재고, 일평균출고
-            f'<td class="num">{fmt_num(미입고)}</td>'                 # 발주미입고
-            f'<td></td>'                                              # 상태정보
-            f'<td></td>'                                              # 구분
+            f'<td></td><td></td>'
+            f'<td colspan="2" style="padding-left:6px">{발주주체}</td>'
+            f'<td class="left" style="font-size:10px">{품명[:15]}</td>'
+            f'<td class="num">{fmt_num(safe_int(구입가))}</td>'
+            f'<td></td><td></td><td></td><td></td>'
+            f'<td class="num">{fmt_num(미입고_v)}</td>'
+            f'<td></td><td></td>'
             f'{empty_month_tds}'
-            f'</tr>\n'
+            f'</tr>'
         )
 
     return f"""
     <div class="tbl-wrap">
       <table class="main-tbl">
         {header}
-        <tbody>{rows}</tbody>
+        <tbody>{"".join(row_parts)}</tbody>
       </table>
     </div>
     """
 
 
 # ─── 렌더링 ─────────────────────────────────────────────────────
-table_html = build_table(df, sel_months)
+col_map = {
+    "품명": col_품명, "품번": col_품번, "상태": col_상태,
+    "발주주체": col_발주주체, "발주구분": col_발주구분,
+    "판매가": col_판매가, "구입가": col_구입가,
+    "미입고": col_미입고, "입고예정": col_입고예정,
+    "정상재고": col_정상재고, "일출고량": col_일출고량,
+    "SN통화": col_SN통화, "SN금액": col_SN금액,
+    "사진주소": col_사진주소,
+}
+table_html = build_table(df.to_json(), tuple(sel_months), col_map)
 st.markdown(table_html, unsafe_allow_html=True)
-
-st.markdown("<br>", unsafe_allow_html=True)
