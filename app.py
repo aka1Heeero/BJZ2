@@ -192,18 +192,20 @@ def load_data():
 
 
 # ─── 유틸 함수 ───────────────────────────────────────────────────
-def gen_month_labels():
-    months = []
-    for y in range(24, 27):
-        for m in range(1, 13):
-            months.append(f"{y:02d}/{m:02d}")
-            if y == 26 and m == 4:
-                return months
-    return months
-
-
-ALL_MONTHS = gen_month_labels()
 ROW_TYPES = ["발주", "입고", "출고", "POS판매", "물류재고", "매장재고", "보유매장", "미입고"]
+
+
+def detect_months(df):
+    """데이터에 실제 존재하는 월 컬럼을 자동 감지하여 정렬된 리스트로 반환"""
+    found = set()
+    for c in df.columns:
+        for rt in ROW_TYPES:
+            prefix = f"{rt}_"
+            if c.startswith(prefix):
+                m = c[len(prefix):]
+                if len(m) == 5 and m[2] == "/" and m[:2].isdigit() and m[3:].isdigit():
+                    found.add(m)
+    return sorted(found)
 
 
 def get_col(df, *names):
@@ -297,20 +299,7 @@ col_입고예정 = get_col(df_raw, "입고예정")
 col_SN통화   = get_col(df_raw, "통화")
 col_SN금액   = get_col(df_raw, "금액")
 
-# ─── 컬럼 매핑 확인 (디버그) ────────────────────────────────────
-with st.expander("🔧 컬럼 매핑 확인", expanded=False):
-    mapping = {
-        "담당": col_담당, "대분류": col_대분류, "중분류": col_중분류,
-        "소분류": col_소분류, "품명": col_품명, "품번": col_품번,
-        "상태": col_상태, "발주주체": col_발주주체, "발주구분": col_발주구분,
-        "판매가": col_판매가, "구입가": col_구입가, "사진주소": col_사진주소,
-        "업체명": col_업체명, "관계사팀": col_관계사팀,
-        "정상재고": col_정상재고, "일출고량": col_일출고량,
-        "미입고": col_미입고, "입고예정": col_입고예정,
-        "SN통화": col_SN통화, "SN금액": col_SN금액,
-    }
-    st.write(mapping)
-    st.write("전체 컬럼 (앞 30개):", list(df_raw.columns[:30]))
+
 # ─── 필터 UI ────────────────────────────────────────────────────
 # 1행: 대분류, 중분류, 소분류
 fc1, fc2, fc3 = st.columns(3)
@@ -348,20 +337,6 @@ with fc6:
     opts_업체 = ["전체"] + unique_vals(df_raw, col_업체명)
     sel_업체 = st.selectbox("업체", opts_업체)
 
-# ─── 월 범위 선택 ────────────────────────────────────────────────
-with st.expander("📅 조회 월 범위 선택", expanded=False):
-    mc1, mc2 = st.columns(2)
-    with mc1:
-        start_month = st.selectbox("시작 월", ALL_MONTHS, index=max(0, len(ALL_MONTHS) - 6))
-    with mc2:
-        end_month = st.selectbox("종료 월", ALL_MONTHS, index=len(ALL_MONTHS) - 1)
-
-si = ALL_MONTHS.index(start_month) if start_month in ALL_MONTHS else 0
-ei = ALL_MONTHS.index(end_month) if end_month in ALL_MONTHS else len(ALL_MONTHS) - 1
-if si > ei:
-    si, ei = ei, si
-sel_months = ALL_MONTHS[si: ei + 1]
-
 # 조회 버튼 — 누를 때만 필터 결과를 session_state에 저장
 _, btn_col, _ = st.columns([3, 1, 3])
 with btn_col:
@@ -385,7 +360,6 @@ if do_search:
         df = df[df[col_업체명] == sel_업체]
     df = df.reset_index(drop=True)
     st.session_state["filtered_df"] = df
-    st.session_state["filtered_months"] = list(sel_months)
 
 # 이전 조회 결과가 있으면 표시, 없으면 안내
 if "filtered_df" not in st.session_state:
@@ -393,7 +367,7 @@ if "filtered_df" not in st.session_state:
     st.stop()
 
 df = st.session_state["filtered_df"]
-sel_months = st.session_state["filtered_months"]
+sel_months = detect_months(df_raw)
 
 st.markdown(f"**조회 결과: 총 {len(df)}개 상품**")
 
