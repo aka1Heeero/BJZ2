@@ -5,7 +5,7 @@ from google.oauth2.service_account import Credentials
 
 # ─── 페이지 설정 ───────────────────────────────────────────────
 st.set_page_config(
-    page_title="BJ-KLP",
+    page_title="발주관리표2",
     page_icon="📦",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -15,45 +15,41 @@ st.set_page_config(
 st.markdown("""
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
-
-  html, body, [class*="css"] {
-    font-family: 'Noto Sans KR', sans-serif;
-    font-size: 12px;
-  }
+  html, body, [class*="css"] { font-family: 'Noto Sans KR', sans-serif; font-size: 12px; }
   .stApp { background: #f5f5f5; }
 
-  /* 헤더 */
   .page-header {
     display: flex; align-items: center; gap: 8px;
-    padding: 8px 16px; margin-bottom: 10px;
+    padding: 8px 16px; margin-bottom: 12px;
   }
   .page-header .dot { color: #e53e3e; font-size: 18px; }
   .page-header h1 { font-size: 1.1rem; font-weight: 700; margin: 0; color: #1a1a1a; }
 
   /* 필터 영역 */
-  .filter-box {
-    background: white; border: 1px solid #ccc; padding: 10px 14px;
-    margin-bottom: 10px; font-size: 12px;
+  .filter-area {
+    background: white; border: 1px solid #ccc;
+    padding: 12px 16px; margin-bottom: 10px;
+    border-radius: 4px;
   }
-  .filter-box label { font-weight: 500; color: #333; margin-right: 4px; }
 
   /* 조회 버튼 */
-  .search-btn-wrap div.stButton > button {
-    background: #e8e8e8; color: #333; border: 1px solid #aaa;
-    border-radius: 3px; padding: 4px 16px; font-size: 12px;
-    font-weight: 600;
+  div.stButton > button {
+    background: #1a3a5c; color: white; border: none;
+    border-radius: 4px; padding: 6px 24px;
+    font-weight: 600; font-size: 13px; cursor: pointer;
   }
+  div.stButton > button:hover { background: #2d6a9f; }
 
-  /* 메인 테이블 */
+  /* 결과 테이블 */
   .tbl-wrap { overflow-x: auto; margin-top: 6px; }
   table.main-tbl {
-    border-collapse: collapse; width: 100%; font-size: 11px;
-    border: 1px solid #999;
+    border-collapse: collapse; width: 100%;
+    font-size: 11px; border: 1px solid #999;
   }
   table.main-tbl th {
-    background: #f0f0f0; color: #333; font-weight: 600;
-    padding: 4px 6px; border: 1px solid #bbb;
-    text-align: center; white-space: nowrap; font-size: 11px;
+    background: #dce6f1; color: #1a1a1a; font-weight: 600;
+    padding: 5px 6px; border: 1px solid #bbb;
+    text-align: center; white-space: nowrap;
     position: sticky; top: 0; z-index: 2;
   }
   table.main-tbl td {
@@ -64,64 +60,46 @@ st.markdown("""
   table.main-tbl td.center { text-align: center; }
   table.main-tbl td.left { text-align: left; }
 
-  /* 상품 구분 행 - 첫 행 */
-  table.main-tbl tr.prod-first td { border-top: 2px solid #888; }
+  /* 상품 첫 행 구분선 */
+  table.main-tbl tr.prod-first td { border-top: 2px solid #666; }
 
   /* POS판매 행 강조 */
   table.main-tbl tr.row-pos td { background: #ffe0e0; }
-  table.main-tbl tr.row-pos td.type-label { background: #ffcccc; color: #c00; font-weight: 600; }
-
-  /* 구분 라벨 */
-  table.main-tbl td.type-label {
-    text-align: center; font-weight: 500; background: #fafafa;
-    min-width: 55px;
+  table.main-tbl tr.row-pos td.type-label {
+    background: #ffcccc; color: #c00; font-weight: 700;
   }
 
-  /* 0값 스타일 */
-  table.main-tbl td.zero-val { color: #bbb; }
+  /* 구분 라벨 셀 */
+  table.main-tbl td.type-label {
+    text-align: center; font-weight: 500;
+    background: #f8f8f8; min-width: 55px;
+  }
 
-  /* 발주주체 셀 */
-  table.main-tbl td.owner-cell {
-    font-weight: 500; font-size: 10px; color: #555;
-    vertical-align: bottom; padding-bottom: 2px;
+  /* 0값 */
+  table.main-tbl td.zero-val { color: #ccc; }
+
+  /* 발주주체 행 */
+  table.main-tbl tr.owner-row td {
+    background: #f0f4f8; font-size: 10px;
+    color: #555; font-weight: 500;
+    border-top: 1px dashed #bbb;
   }
 
   /* 상태 배지 */
   .st-badge {
-    display: inline-block; padding: 1px 6px; border-radius: 2px;
-    font-size: 10px; font-weight: 600;
+    display: inline-block; padding: 1px 5px;
+    border-radius: 2px; font-size: 10px; font-weight: 600;
   }
   .st-badge.신상품 { background: #d4edda; color: #155724; }
   .st-badge.단종대기 { background: #f8d7da; color: #721c24; }
   .st-badge.정상 { background: #e2e3e5; color: #383d41; }
+  .st-badge.기타 { background: #fff3cd; color: #856404; }
 
-  /* selectbox 크기 조정 */
   .stSelectbox > div > div { font-size: 12px !important; }
-  .stMultiSelect > div > div { font-size: 12px !important; }
-  .stCheckbox label { font-size: 12px !important; }
-
-  /* 로딩 스피너 숨김 */
   div[data-testid="stStatusWidget"] { display: none; }
 
-  /* 상품 이미지 */
-  table.main-tbl td.img-cell {
-    text-align: center; vertical-align: middle; padding: 2px;
-  }
-  table.main-tbl td.img-cell img {
-    width: 48px; height: 48px; object-fit: contain;
-    border: 1px solid #ddd; border-radius: 3px; background: #fff;
-  }
-  table.main-tbl td.img-cell .img-placeholder {
-    width: 48px; height: 48px; background: #f0f0f0;
-    border: 1px solid #ddd; border-radius: 3px;
-    display: inline-flex; align-items: center; justify-content: center;
-    font-size: 18px; color: #bbb;
-  }
-
-  /* 아이패드 최적화 */
   @media (max-width: 1024px) {
     table.main-tbl th, table.main-tbl td { padding: 2px 3px; font-size: 10px; }
-    table.main-tbl td.img-cell img { width: 36px; height: 36px; }
   }
 </style>
 """, unsafe_allow_html=True)
@@ -140,50 +118,101 @@ def get_gsheet_client():
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     return gspread.authorize(creds)
 
+
 @st.cache_data(ttl=300)
 def load_data():
+    """
+    구글 시트 구조:
+      행0 (row1): 카테고리 — 구분, S/N단가, 발주, 입고, 출고, POS판매, 물류재고, 매장재고, 보유매장, 미입고
+      행1 (row2): 세부 컬럼명 — 발주주체, 발주구분, 품번, 품명, ... 24/11, 24/12, ...
+      행2~  : 실제 데이터
+
+    월별 컬럼은 '카테고리_월' 형태로 생성 (예: 발주_24/11, POS판매_25/03)
+    기본 정보 컬럼은 세부 컬럼명 그대로 사용
+    중복 컬럼명은 _2, _3 suffix로 처리
+    """
     try:
         client = get_gsheet_client()
         sh = client.open_by_key(SHEET_ID)
         ws = sh.get_worksheet(0)
         data = ws.get_all_values()
-        if not data or len(data) < 2:
+        if not data or len(data) < 3:
             return pd.DataFrame()
-        df = pd.DataFrame(data[1:], columns=data[0])
-        df.columns = df.columns.str.strip()
+
+        row0 = data[0]  # 카테고리 행
+        row1 = data[1]  # 세부 컬럼명 행
+
+        columns = []
+        last_cat = ""
+        for i in range(len(row1)):
+            cat = row0[i].strip() if i < len(row0) else ""
+            sub = row1[i].strip() if row1[i].strip() else ""
+            if cat:
+                last_cat = cat
+
+            # 월 패턴 감지 (예: 24/11, 25/03)
+            is_month = (len(sub) == 5 and sub[2] == "/" and
+                        sub[:2].isdigit() and sub[3:].isdigit())
+
+            if is_month and last_cat and last_cat not in ("구분", ""):
+                col_name = f"{last_cat}_{sub}"
+            else:
+                col_name = sub if sub else f"_col_{i}"
+
+            # 중복 방지
+            base = col_name
+            n = 2
+            while col_name in columns:
+                col_name = f"{base}_{n}"
+                n += 1
+            columns.append(col_name)
+
+        df = pd.DataFrame(data[2:], columns=columns)
+        # 빈 행 제거 (품번이 없는 행)
+        if "품번" in df.columns:
+            df = df[df["품번"].str.strip() != ""]
+        df = df.reset_index(drop=True)
         return df
+
     except Exception as e:
         st.error(f"Google Sheets 연결 오류: {e}")
         return pd.DataFrame()
 
 
-# ─── 월 컬럼 목록 생성 (24/11 ~ 26/04) ─────────────────────────
+# ─── 유틸 함수 ───────────────────────────────────────────────────
 def gen_month_labels():
     months = []
     for y in range(24, 27):
         for m in range(1, 13):
-            lbl = f"{y:02d}/{m:02d}"
-            months.append(lbl)
+            months.append(f"{y:02d}/{m:02d}")
             if y == 26 and m == 4:
                 return months
     return months
+
 
 ALL_MONTHS = gen_month_labels()
 ROW_TYPES = ["발주", "입고", "출고", "POS판매", "물류재고", "매장재고", "보유매장", "미입고"]
 
 
-def get_col(df, name):
-    if name in df.columns:
-        return name
-    for c in df.columns:
-        if name in c or c in name:
-            return c
+def get_col(df, *names):
+    """여러 후보 이름 중 첫 번째로 매칭되는 컬럼 반환 (월별 컬럼 제외)"""
+    for name in names:
+        if name in df.columns:
+            return name
+    for name in names:
+        for c in df.columns:
+            if "_" in c and "/" in c:
+                continue  # 월별 컬럼 제외
+            if name == c or name in c or c in name:
+                return c
     return None
 
 
 def safe_int(v):
     try:
-        return int(float(str(v).replace(",", ""))) if v not in ("", None) else 0
+        if v in ("", None):
+            return 0
+        return int(float(str(v).replace(",", "")))
     except:
         return 0
 
@@ -196,10 +225,16 @@ def get_monthly_val(row, row_type, month):
 
 
 def fmt_num(v):
-    """숫자 포맷: 0이면 0, 아니면 천단위 콤마"""
     if v == 0:
         return "0"
     return f"{v:,}"
+
+
+def unique_vals(df, col):
+    """컬럼의 고유값 정렬 리스트 반환"""
+    if col is None:
+        return []
+    return sorted([v for v in df[col].dropna().unique() if str(v).strip()])
 
 
 # ─── 헤더 ───────────────────────────────────────────────────────
@@ -219,213 +254,91 @@ if df_raw.empty:
     st.stop()
 
 # ─── 컬럼명 파악 ─────────────────────────────────────────────────
-col_담당 = get_col(df_raw, "담당")
-col_대분류 = get_col(df_raw, "대분류")
-col_중분류 = get_col(df_raw, "중분류")
-col_소분류 = get_col(df_raw, "소분류")
-col_품명 = get_col(df_raw, "품명")
-col_품번 = get_col(df_raw, "품번")
-col_상태 = get_col(df_raw, "상태")
+col_담당     = get_col(df_raw, "담당")
+col_대분류   = get_col(df_raw, "대분류")
+col_중분류   = get_col(df_raw, "중분류")
+col_소분류   = get_col(df_raw, "소분류")
+col_품명     = get_col(df_raw, "품명")
+col_품번     = get_col(df_raw, "품번")
+col_상태     = get_col(df_raw, "상태")
 col_발주주체 = get_col(df_raw, "발주주체")
 col_발주구분 = get_col(df_raw, "발주구분")
-col_판매가 = get_col(df_raw, "판매가")
-col_구입가 = get_col(df_raw, "구입가")
+col_판매가   = get_col(df_raw, "판매가")
+col_구입가   = get_col(df_raw, "구입가")
 col_사진주소 = get_col(df_raw, "사진주소")
-col_업체명 = get_col(df_raw, "업체명")
+col_업체명   = get_col(df_raw, "업체명")
 col_관계사팀 = get_col(df_raw, "관계사팀")
-col_등급 = get_col(df_raw, "등급")
-col_정상재고 = get_col(df_raw, "정상재고") or get_col(df_raw, "정상 재고")
-col_일출고량 = get_col(df_raw, "일출고량") or get_col(df_raw, "일출고")
-col_미입고 = get_col(df_raw, "미입고")
+col_정상재고 = get_col(df_raw, "정상재고", "정상 재고")
+col_일출고량 = get_col(df_raw, "일출고량", "일출고")
+col_미입고   = get_col(df_raw, "미입고")
 col_입고예정 = get_col(df_raw, "입고예정")
-col_SN통화 = get_col(df_raw, "통화") or get_col(df_raw, "S/N단가_통화")
-col_SN금액 = get_col(df_raw, "금액") or get_col(df_raw, "S/N단가_금액")
-col_SN재고일 = get_col(df_raw, "재고 일수") or get_col(df_raw, "재고일") or get_col(df_raw, "S/N단가_재고일")
+col_SN통화   = get_col(df_raw, "통화")
+col_SN금액   = get_col(df_raw, "금액")
 
-# ─── 필터 UI (샘플 사진 스타일) ──────────────────────────────────
 
-# 1행: 등록일자, 상품담당자, 수입구분
-r1c1, r1c2, r1c3, r1c4 = st.columns([1.2, 1, 1, 1])
-with r1c1:
-    등록일자 = st.text_input("등록일자", value="2025/04", disabled=True)
-with r1c2:
-    담당_options = ["- 전체 -"]
-    if col_담당:
-        vals = sorted(df_raw[col_담당].dropna().unique().tolist())
-        담당_options += [v for v in vals if v.strip()]
-    sel_담당 = st.selectbox("상품담당자", 담당_options)
-with r1c3:
-    수입구분_options = ["- 전체 -"]
-    sel_수입구분 = st.selectbox("수입구분", 수입구분_options)
-with r1c4:
-    pass
+# ─── 필터 UI ────────────────────────────────────────────────────
+# 1행: 대분류, 중분류, 소분류
+fc1, fc2, fc3 = st.columns(3)
 
-# 2행: 상태, 단종예정포함, 관계사팀, 결품상태
-r2c1, r2c2, r2c3, r2c4 = st.columns([1.2, 1, 1, 1])
-with r2c1:
-    상태_options = ["전체"]
-    if col_상태:
-        vals = sorted(df_raw[col_상태].dropna().unique().tolist())
-        상태_options += [v for v in vals if v.strip()]
-    sel_상태 = st.selectbox("상태", 상태_options)
-with r2c2:
-    단종포함 = st.checkbox("단종예정포함", value=True)
-with r2c3:
-    관계사팀_options = ["- 전체 -"]
-    if col_관계사팀:
-        vals = sorted(df_raw[col_관계사팀].dropna().unique().tolist())
-        관계사팀_options += [v for v in vals if v.strip()]
-    sel_관계사팀 = st.selectbox("관계사팀", 관계사팀_options)
-with r2c4:
-    결품_options = ["- 전체 -"]
-    sel_결품 = st.selectbox("결품상태", 결품_options)
+with fc1:
+    opts_대 = ["전체"] + unique_vals(df_raw, col_대분류)
+    sel_대분류 = st.selectbox("대분류", opts_대)
 
-# 3행: 상품등급, 납품업체
-r3c1, r3c2, r3c3, r3c4 = st.columns([1.2, 1, 1, 1])
-with r3c1:
-    등급_options = ["- 전체 -"]
-    if col_등급:
-        vals = sorted(df_raw[col_등급].dropna().unique().tolist())
-        등급_options += [v for v in vals if v.strip()]
-    sel_등급 = st.selectbox("상품등급", 등급_options)
-with r3c2:
-    업체_options = ["전체"]
-    if col_업체명:
-        vals = sorted(df_raw[col_업체명].dropna().unique().tolist())
-        업체_options += [v for v in vals if v.strip()]
-    sel_업체 = st.selectbox("납품업체", 업체_options)
-with r3c3:
-    pass
-with r3c4:
-    pass
+with fc2:
+    df_f = df_raw if sel_대분류 == "전체" else df_raw[df_raw[col_대분류] == sel_대분류]
+    opts_중 = ["전체"] + unique_vals(df_f, col_중분류)
+    sel_중분류 = st.selectbox("중분류", opts_중)
 
-# 4행: 상품분류 (대/중/소)
-r4c1, r4c2, r4c3, r4c4 = st.columns([1.2, 1, 1, 1])
-with r4c1:
-    대분류_options = ["전체"]
-    if col_대분류:
-        vals = sorted(df_raw[col_대분류].dropna().unique().tolist())
-        대분류_options += [v for v in vals if v.strip()]
-    sel_대분류 = st.selectbox("상품분류(대)", 대분류_options)
-with r4c2:
-    중분류_options = ["전체"]
-    if col_중분류:
-        df_f = df_raw if sel_대분류 == "전체" else df_raw[df_raw[col_대분류] == sel_대분류]
-        vals = sorted(df_f[col_중분류].dropna().unique().tolist())
-        중분류_options += [v for v in vals if v.strip()]
-    sel_중분류 = st.selectbox("상품분류(중)", 중분류_options)
-with r4c3:
-    소분류_options = ["전체"]
-    if col_소분류:
-        df_f2 = df_raw.copy()
-        if sel_대분류 != "전체" and col_대분류:
-            df_f2 = df_f2[df_f2[col_대분류] == sel_대분류]
-        if sel_중분류 != "전체" and col_중분류:
-            df_f2 = df_f2[df_f2[col_중분류] == sel_중분류]
-        vals = sorted(df_f2[col_소분류].dropna().unique().tolist())
-        소분류_options += [v for v in vals if v.strip()]
-    sel_소분류 = st.selectbox("상품분류(소)", 소분류_options)
-with r4c4:
-    pass
+with fc3:
+    df_f2 = df_raw.copy()
+    if sel_대분류 != "전체" and col_대분류:
+        df_f2 = df_f2[df_f2[col_대분류] == sel_대분류]
+    if sel_중분류 != "전체" and col_중분류:
+        df_f2 = df_f2[df_f2[col_중분류] == sel_중분류]
+    opts_소 = ["전체"] + unique_vals(df_f2, col_소분류)
+    sel_소분류 = st.selectbox("소분류", opts_소)
 
-# 5행: 품번 검색
-r5c1, r5c2, r5c3, r5c4 = st.columns([1.2, 1, 1, 1])
-with r5c1:
-    품번검색 = st.text_input("품번", placeholder="품번 입력")
-with r5c2:
-    pass
-with r5c3:
-    pass
-with r5c4:
-    pass
+# 2행: 담당자, 관계사팀, 업체
+fc4, fc5, fc6 = st.columns(3)
 
-# 발주주체 체크박스
-st.markdown("---")
-chk_c1, chk_c2, chk_c3, chk_c4, chk_c5 = st.columns([0.6, 0.8, 0.8, 0.8, 0.8])
-with chk_c1:
-    st.markdown("**발주주체**")
-with chk_c2:
-    chk_발주팀 = st.checkbox("발주팀", value=True)
-with chk_c3:
-    chk_MD = st.checkbox("MD", value=True)
-with chk_c4:
-    chk_재발주불가 = st.checkbox("재발주불가", value=True)
-with chk_c5:
-    chk_재발주보류 = st.checkbox("재발주보류", value=True)
+with fc4:
+    opts_담당 = ["전체"] + unique_vals(df_raw, col_담당)
+    sel_담당 = st.selectbox("담당자", opts_담당)
 
-# 정렬조건 + 조회 버튼
-sort_c1, sort_c2, btn_c = st.columns([1, 1, 1])
-with sort_c1:
-    정렬조건 = st.selectbox("정렬조건", ["품번별", "품명별", "판매가별"])
-with btn_c:
-    search_btn = st.button("🔍 조회", use_container_width=True)
+with fc5:
+    opts_관계사 = ["전체"] + unique_vals(df_raw, col_관계사팀)
+    sel_관계사팀 = st.selectbox("관계사팀", opts_관계사)
+
+with fc6:
+    opts_업체 = ["전체"] + unique_vals(df_raw, col_업체명)
+    sel_업체 = st.selectbox("업체", opts_업체)
+
+# 조회 버튼
+_, btn_col, _ = st.columns([3, 1, 3])
+with btn_col:
+    st.button("🔍 조회", use_container_width=True)
 
 st.markdown("---")
+
 
 # ─── 필터 적용 ──────────────────────────────────────────────────
 df = df_raw.copy()
 
-# 담당자
-if sel_담당 != "- 전체 -" and col_담당:
-    df = df[df[col_담당] == sel_담당]
-
-# 상태
-if sel_상태 != "전체" and col_상태:
-    df = df[df[col_상태] == sel_상태]
-if not 단종포함 and col_상태:
-    df = df[df[col_상태] != "단종대기"]
-
-# 관계사팀
-if sel_관계사팀 != "- 전체 -" and col_관계사팀:
-    df = df[df[col_관계사팀] == sel_관계사팀]
-
-# 등급
-if sel_등급 != "- 전체 -" and col_등급:
-    df = df[df[col_등급] == sel_등급]
-
-# 업체
-if sel_업체 != "전체" and col_업체명:
-    df = df[df[col_업체명] == sel_업체]
-
-# 대분류
 if sel_대분류 != "전체" and col_대분류:
     df = df[df[col_대분류] == sel_대분류]
 if sel_중분류 != "전체" and col_중분류:
     df = df[df[col_중분류] == sel_중분류]
 if sel_소분류 != "전체" and col_소분류:
     df = df[df[col_소분류] == sel_소분류]
-
-# 품번 검색
-if 품번검색 and col_품번:
-    df = df[df[col_품번].astype(str).str.contains(품번검색, na=False)]
-
-# 발주주체 필터
-if col_발주주체:
-    allowed = []
-    if chk_발주팀:
-        allowed.append("발주팀")
-    if chk_MD:
-        allowed.append("MD")
-    if chk_재발주불가:
-        allowed.append("재발주불가")
-    if chk_재발주보류:
-        allowed.append("재발주보류")
-    if allowed:
-        df = df[df[col_발주주체].isin(allowed)]
-    else:
-        df = df.iloc[0:0]
-
-# 정렬
-if 정렬조건 == "품번별" and col_품번:
-    df = df.sort_values(col_품번)
-elif 정렬조건 == "품명별" and col_품명:
-    df = df.sort_values(col_품명)
-elif 정렬조건 == "판매가별" and col_판매가:
-    df["_판매가_sort"] = df[col_판매가].apply(lambda x: safe_int(x))
-    df = df.sort_values("_판매가_sort", ascending=False)
-    df = df.drop(columns=["_판매가_sort"])
+if sel_담당 != "전체" and col_담당:
+    df = df[df[col_담당] == sel_담당]
+if sel_관계사팀 != "전체" and col_관계사팀:
+    df = df[df[col_관계사팀] == sel_관계사팀]
+if sel_업체 != "전체" and col_업체명:
+    df = df[df[col_업체명] == sel_업체]
 
 df = df.reset_index(drop=True)
+
 
 # ─── 월 범위 선택 ────────────────────────────────────────────────
 with st.expander("📅 조회 월 범위 선택", expanded=False):
@@ -439,156 +352,193 @@ si = ALL_MONTHS.index(start_month) if start_month in ALL_MONTHS else 0
 ei = ALL_MONTHS.index(end_month) if end_month in ALL_MONTHS else len(ALL_MONTHS) - 1
 if si > ei:
     si, ei = ei, si
-sel_months = ALL_MONTHS[si : ei + 1]
+sel_months = ALL_MONTHS[si: ei + 1]
 
-# ─── 결과 카운트 ─────────────────────────────────────────────────
 st.markdown(f"**조회 결과: 총 {len(df)}개 상품**")
 
 if df.empty:
     st.info("조회 결과가 없습니다.")
     st.stop()
 
-# ─── 테이블 HTML 생성 (샘플 사진 스타일) ─────────────────────────
 
-def build_table_html(df, months):
-    """샘플 사진과 동일한 테이블 레이아웃 생성"""
-    num_months = len(months)
+# ─── 사진 팝업 (session_state) ───────────────────────────────────
+if "photo_url" not in st.session_state:
+    st.session_state.photo_url = None
+if "photo_name" not in st.session_state:
+    st.session_state.photo_name = ""
 
-    # 헤더 행
-    header1 = """
-    <tr>
-      <th rowspan="2" style="min-width:35px">순번</th>
-      <th rowspan="2" style="min-width:55px">사진</th>
-      <th rowspan="2" style="min-width:55px">발주구분</th>
-      <th rowspan="2" style="min-width:75px">품번</th>
-      <th rowspan="2" style="min-width:160px">품명</th>
-      <th colspan="2" style="min-width:80px">?입원가</th>
-      <th rowspan="2" style="min-width:50px">기본정보<br>가용재고</th>
-      <th rowspan="2" style="min-width:45px">가용<br>일수</th>
-      <th rowspan="2" style="min-width:45px">일평균<br>출고량</th>
-      <th rowspan="2" style="min-width:45px">발주<br>미입고</th>
-      <th rowspan="2" style="min-width:140px">상태정보</th>
-      <th rowspan="2" style="min-width:55px">구분</th>
-      <th rowspan="2" style="min-width:50px">합계</th>
+if st.session_state.photo_url:
+    with st.container():
+        col_img, col_close = st.columns([4, 1])
+        with col_img:
+            st.markdown(f"**📷 {st.session_state.photo_name}**")
+            st.image(st.session_state.photo_url, width=280)
+        with col_close:
+            if st.button("✕ 닫기"):
+                st.session_state.photo_url = None
+                st.session_state.photo_name = ""
+                st.rerun()
+    st.markdown("---")
+
+
+# ─── 테이블 HTML 생성 ────────────────────────────────────────────
+def build_table(df, months):
+    # 헤더
+    month_ths = "".join(
+        f'<th style="min-width:42px">{m}</th>' for m in months
+    )
+    header = f"""
+    <thead>
+      <tr>
+        <th rowspan="2" style="min-width:32px">순번</th>
+        <th rowspan="2" style="min-width:60px">발주구분<br>상태</th>
+        <th rowspan="2" style="min-width:80px">품번</th>
+        <th rowspan="2" style="min-width:170px">품명</th>
+        <th rowspan="2" style="min-width:55px">판매가</th>
+        <th colspan="2" style="min-width:90px">S/N단가</th>
+        <th rowspan="2" style="min-width:50px">가용<br>재고</th>
+        <th rowspan="2" style="min-width:45px">일평균<br>출고</th>
+        <th rowspan="2" style="min-width:45px">발주<br>미입고</th>
+        <th rowspan="2" style="min-width:150px">상태정보</th>
+        <th rowspan="2" style="min-width:55px">구분</th>
+        <th rowspan="2" style="min-width:48px">합계</th>
+        {month_ths.replace('rowspan="2"', '')}
+      </tr>
+      <tr>
+        <th>통화</th>
+        <th>금액</th>
+      </tr>
+    </thead>
     """
-    for m in months:
-        header1 += f'<th rowspan="2" style="min-width:42px">{m}</th>'
-    header1 += "</tr>"
 
-    header2 = """
-    <tr>
-      <th>판매가</th>
-      <th>통화 / 금액</th>
-    </tr>
-    """
-
-    # 데이터 행
-    body_rows = ""
+    rows = ""
     for idx, (_, row) in enumerate(df.iterrows()):
-        품명 = row[col_품명] if col_품명 else ""
-        품번 = row[col_품번] if col_품번 else ""
-        상태 = row[col_상태] if col_상태 else ""
-        발주주체 = row[col_발주주체] if col_발주주체 else ""
-        발주구분 = row[col_발주구분] if col_발주구분 else ""
-        판매가 = row[col_판매가] if col_판매가 else ""
-        구입가 = row[col_구입가] if col_구입가 else ""
-        미입고_val = row[col_미입고] if col_미입고 else ""
-        입고예정_val = row[col_입고예정] if col_입고예정 else ""
-        정상재고_val = row[col_정상재고] if col_정상재고 else "0"
-        일출고량_val = row[col_일출고량] if col_일출고량 else "0"
-        sn_통화 = row[col_SN통화] if col_SN통화 else ""
-        sn_금액 = row[col_SN금액] if col_SN금액 else ""
-        사진주소 = row[col_사진주소] if col_사진주소 else ""
-
-        # 이미지 HTML
-        if 사진주소 and str(사진주소).strip().startswith("http"):
-            img_html = f'<img src="{사진주소}" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline-flex\'"/><span class="img-placeholder" style="display:none">📦</span>'
-        else:
-            img_html = '<span class="img-placeholder">📦</span>'
+        품명     = str(row[col_품명]     if col_품명     else "")
+        품번     = str(row[col_품번]     if col_품번     else "")
+        상태     = str(row[col_상태]     if col_상태     else "")
+        발주주체 = str(row[col_발주주체] if col_발주주체 else "")
+        발주구분 = str(row[col_발주구분] if col_발주구분 else "")
+        판매가   = str(row[col_판매가]   if col_판매가   else "")
+        구입가   = str(row[col_구입가]   if col_구입가   else "")
+        미입고   = safe_int(row[col_미입고]   if col_미입고   else 0)
+        입고예정 = str(row[col_입고예정] if col_입고예정 else "")
+        정상재고 = safe_int(row[col_정상재고] if col_정상재고 else 0)
+        일출고   = safe_int(row[col_일출고량] if col_일출고량 else 0)
+        sn_통화  = str(row[col_SN통화]   if col_SN통화   else "")
+        sn_금액  = safe_int(row[col_SN금액] if col_SN금액 else 0)
+        사진주소 = str(row[col_사진주소] if col_사진주소 else "")
 
         # 상태 배지
-        badge_cls = ""
-        if 상태 in ("신상품", "단종대기", "정상"):
-            badge_cls = 상태
-        상태_html = f'<span class="st-badge {badge_cls}">{상태}</span>' if 상태 else ""
+        badge_map = {"신상품": "신상품", "단종대기": "단종대기", "정상": "정상"}
+        badge_cls = badge_map.get(상태, "기타")
+        badge_html = f'<span class="st-badge {badge_cls}">{상태}</span>'
 
-        # 상태정보 텍스트
-        미입고_int = safe_int(미입고_val)
-        상태정보 = str(입고예정_val) if 입고예정_val else ""
+        # 사진 버튼 (사진주소가 있을 때만)
+        has_photo = 사진주소.startswith("http")
+        photo_btn = ""
+        if has_photo:
+            # URL과 품명을 안전하게 인코딩
+            safe_url  = 사진주소.replace('"', '%22')
+            safe_name = 품명.replace('"', '').replace("'", "")[:30]
+            photo_btn = (
+                f' <button onclick="window.parent.postMessage({{type:\'streamlit:setComponentValue\','
+                f'value:{{url:\'{safe_url}\',name:\'{safe_name}\'}}}},\'*\')" '
+                f'style="font-size:10px;padding:1px 5px;cursor:pointer;'
+                f'border:1px solid #aaa;border-radius:3px;background:#f0f0f0">📷</button>'
+            )
 
-        num_row_types = len(ROW_TYPES)
-        seq_num = idx + 1
+        rs = len(ROW_TYPES)
+        seq = idx + 1
 
         for ri, rt in enumerate(ROW_TYPES):
             is_first = ri == 0
-            is_pos = rt == "POS판매"
-            tr_class_parts = []
+            is_pos   = rt == "POS판매"
+            tr_cls   = []
             if is_first:
-                tr_class_parts.append("prod-first")
+                tr_cls.append("prod-first")
             if is_pos:
-                tr_class_parts.append("row-pos")
-            tr_class = f' class="{" ".join(tr_class_parts)}"' if tr_class_parts else ""
+                tr_cls.append("row-pos")
+            tr_attr = f' class="{" ".join(tr_cls)}"' if tr_cls else ""
 
             cells = ""
-
             if is_first:
-                rs = num_row_types
-                cells += f'<td class="center" rowspan="{rs}">{seq_num}</td>'
-                cells += f'<td class="img-cell" rowspan="{rs}">{img_html}</td>'
-                cells += f'<td class="center" rowspan="{rs}">{상태_html}<br>{발주구분}</td>'
-                cells += f'<td class="center" rowspan="{rs}" style="font-family:monospace;font-size:10px">{품번}</td>'
-                cells += f'<td class="left" rowspan="{rs}" style="font-size:10px">{품명}</td>'
-                cells += f'<td class="num" rowspan="{rs}">{fmt_num(safe_int(판매가))}</td>'
-                cells += f'<td class="center" rowspan="{rs}" style="font-size:10px">{sn_통화}<br>{fmt_num(safe_int(sn_금액))}</td>'
-                cells += f'<td class="num" rowspan="{rs}">{fmt_num(safe_int(정상재고_val))}</td>'
-                cells += f'<td class="num" rowspan="{rs}"></td>'
-                cells += f'<td class="num" rowspan="{rs}">{fmt_num(safe_int(일출고량_val))}</td>'
-                cells += f'<td class="num" rowspan="{rs}">{fmt_num(미입고_int)}</td>'
-                cells += f'<td class="left" rowspan="{rs}" style="font-size:10px">{상태정보}</td>'
+                cells += f'<td class="center" rowspan="{rs}">{seq}</td>'
+                cells += f'<td class="center" rowspan="{rs}">{badge_html}<br><small>{발주구분}</small></td>'
+                cells += f'<td class="center" rowspan="{rs}" style="font-family:monospace;font-size:10px">{품번}{photo_btn}</td>'
+                cells += f'<td class="left"   rowspan="{rs}" style="font-size:10px;max-width:170px;overflow:hidden;text-overflow:ellipsis">{품명}</td>'
+                cells += f'<td class="num"    rowspan="{rs}">{fmt_num(safe_int(판매가))}</td>'
+                cells += f'<td class="center" rowspan="{rs}" style="font-size:10px">{sn_통화}</td>'
+                cells += f'<td class="num"    rowspan="{rs}">{fmt_num(sn_금액)}</td>'
+                cells += f'<td class="num"    rowspan="{rs}">{fmt_num(정상재고)}</td>'
+                cells += f'<td class="num"    rowspan="{rs}">{fmt_num(일출고)}</td>'
+                cells += f'<td class="num"    rowspan="{rs}">{fmt_num(미입고)}</td>'
+                cells += f'<td class="left"   rowspan="{rs}" style="font-size:10px">{입고예정}</td>'
 
             # 구분 라벨
-            type_cls = "type-label"
-            cells += f'<td class="{type_cls}">{rt}</td>'
+            cells += f'<td class="type-label">{rt}</td>'
 
             # 합계
             total = sum(get_monthly_val(row, rt, m) for m in months)
-            total_cls = "num zero-val" if total == 0 else "num"
-            cells += f'<td class="{total_cls}">{fmt_num(total)}</td>'
+            cells += f'<td class="num {"zero-val" if total == 0 else ""}">{fmt_num(total)}</td>'
 
             # 월별 값
             for m in months:
                 v = get_monthly_val(row, rt, m)
-                val_cls = "num zero-val" if v == 0 else "num"
-                cells += f'<td class="{val_cls}">{fmt_num(v)}</td>'
+                cells += f'<td class="num {"zero-val" if v == 0 else ""}">{fmt_num(v)}</td>'
 
-            body_rows += f"<tr{tr_class}>{cells}</tr>\n"
+            rows += f"<tr{tr_attr}>{cells}</tr>\n"
 
-        # 발주주체 행 (상품 하단)
-        body_rows += f"""
-        <tr>
-          <td colspan="5" class="owner-cell">{발주주체}</td>
-          <td class="num">{fmt_num(safe_int(구입가))}</td>
-          <td></td><td></td><td></td><td></td>
-          <td class="num">{fmt_num(미입고_int)}</td>
-          <td></td><td></td><td></td>
-          {"".join('<td></td>' for _ in months)}
-        </tr>
-        """
+        # 발주주체 행
+        empty_month_tds = "".join("<td></td>" for _ in months)
+        rows += (
+            f'<tr class="owner-row">'
+            f'<td colspan="4" style="padding-left:8px">{발주주체}</td>'
+            f'<td class="num">{fmt_num(safe_int(구입가))}</td>'
+            f'<td></td><td></td><td></td><td></td>'
+            f'<td class="num">{fmt_num(미입고)}</td>'
+            f'<td></td><td></td><td></td>'
+            f'{empty_month_tds}'
+            f'</tr>\n'
+        )
 
-    html = f"""
+    return f"""
     <div class="tbl-wrap">
       <table class="main-tbl">
-        <thead>{header1}{header2}</thead>
-        <tbody>{body_rows}</tbody>
+        {header}
+        <tbody>{rows}</tbody>
       </table>
     </div>
     """
-    return html
 
 
-# ─── 테이블 렌더링 ───────────────────────────────────────────────
-table_html = build_table_html(df, sel_months)
+# ─── 렌더링 ─────────────────────────────────────────────────────
+table_html = build_table(df, sel_months)
 st.markdown(table_html, unsafe_allow_html=True)
 
-# 하단 여백
-st.markdown("<br><br>", unsafe_allow_html=True)
+# ─── 사진 클릭 처리 (품번 selectbox 방식) ────────────────────────
+st.markdown("---")
+st.markdown("**📷 상품 사진 확인** — 품번을 선택하면 사진이 표시됩니다")
+
+photo_options = []
+if col_품번 and col_사진주소:
+    for _, row in df.iterrows():
+        pn = str(row[col_품번]).strip()
+        url = str(row[col_사진주소]).strip()
+        nm = str(row[col_품명] if col_품명 else "").strip()
+        if pn and url.startswith("http"):
+            photo_options.append((f"{pn}  {nm[:20]}", url, nm))
+
+if photo_options:
+    labels = ["— 선택 —"] + [p[0] for p in photo_options]
+    sel_photo = st.selectbox("품번 선택", labels, label_visibility="collapsed")
+    if sel_photo != "— 선택 —":
+        matched = [p for p in photo_options if p[0] == sel_photo]
+        if matched:
+            _, photo_url, photo_name = matched[0]
+            col_p1, col_p2 = st.columns([1, 3])
+            with col_p1:
+                st.image(photo_url, caption=photo_name, width=250)
+else:
+    st.caption("사진 주소가 있는 상품이 없습니다.")
+
+st.markdown("<br>", unsafe_allow_html=True)
