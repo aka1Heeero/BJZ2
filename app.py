@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-
+ 
 # ─── 페이지 설정 ───────────────────────────────────────────────
 st.set_page_config(
     page_title="발주관리표2",
@@ -8,7 +8,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-
+ 
 # ─── 로그인 ────────────────────────────────────────────────────
 def check_password():
     if "authenticated" not in st.session_state:
@@ -27,10 +27,10 @@ def check_password():
             else:
                 st.error("비밀번호가 틀렸습니다.")
     return False
-
+ 
 if not check_password():
     st.stop()
-
+ 
 # ─── CSS ───────────────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -68,11 +68,11 @@ st.markdown("""
   @media (max-width:1024px) { table.main-tbl th, table.main-tbl td { padding:2px 3px; font-size:10px; } }
 </style>
 """, unsafe_allow_html=True)
-
-
+ 
+ 
 # ─── xlsx 파일 로드 ──────────────────────────────────────────────
 DATA_FILE = "BJZ.xlsx"
-
+ 
 @st.cache_data
 def load_data():
     """
@@ -85,18 +85,18 @@ def load_data():
         raw = pd.read_excel(DATA_FILE, header=None, dtype=str, sheet_name=0)
         if len(raw) < 3:
             return pd.DataFrame()
-
+ 
         row0 = [str(v).strip() if pd.notna(v) and str(v) != "nan" else ""
                 for v in raw.iloc[0]]
         row1 = [str(v).strip().replace("\n", " ") if pd.notna(v) and str(v) != "nan" else ""
                 for v in raw.iloc[1]]
-
+ 
         max_cols = raw.shape[1]
         while len(row0) < max_cols:
             row0.append("")
         while len(row1) < max_cols:
             row1.append("")
-
+ 
         columns = []
         last_cat = ""
         for i in range(max_cols):
@@ -104,41 +104,41 @@ def load_data():
             sub = row1[i]
             if cat and cat not in ("nan", ""):
                 last_cat = cat
-
+ 
             # YY/MM 패턴 감지 (예: 26/11)
             is_month = (len(sub) == 5 and sub[2] == "/" and
                         sub[:2].isdigit() and sub[3:].isdigit())
-
+ 
             if is_month and last_cat and last_cat not in ("구분", ""):
                 col_name = f"{last_cat}_{sub}"
             else:
                 col_name = sub if sub else f"_col_{i}"
-
+ 
             base = col_name
             n = 2
             while col_name in columns:
                 col_name = f"{base}_{n}"
                 n += 1
             columns.append(col_name)
-
+ 
         df = pd.DataFrame(raw.iloc[2:].values, columns=columns)
         df = df.astype(str).replace("nan", "").replace("<NA>", "")
-
+ 
         if "품번" in df.columns:
             df = df[df["품번"].str.strip() != ""]
         return df.reset_index(drop=True)
-
+ 
     except FileNotFoundError:
         st.error(f"파일을 찾을 수 없습니다: {DATA_FILE}")
         return pd.DataFrame()
     except Exception as e:
         st.error(f"데이터 로드 오류: {e}")
         return pd.DataFrame()
-
-
+ 
+ 
 # ─── 유틸 함수 ───────────────────────────────────────────────────
 ROW_TYPES = ["발주", "입고", "출고", "POS판매", "물류재고", "매장재고", "보유매장", "미입고"]
-
+ 
 def detect_months(df):
     found = set()
     for c in df.columns:
@@ -149,7 +149,7 @@ def detect_months(df):
                 if len(m) == 5 and m[2] == "/" and m[:2].isdigit() and m[3:].isdigit():
                     found.add(m)
     return sorted(found)
-
+ 
 def get_col(df, *names):
     df_cols = list(df.columns)
     for name in names:
@@ -171,7 +171,7 @@ def get_col(df, *names):
             if name in c:
                 return c
     return None
-
+ 
 def safe_int(v):
     try:
         if v in ("", None, "nan", "<NA>"):
@@ -179,17 +179,17 @@ def safe_int(v):
         return int(float(str(v).replace(",", "")))
     except:
         return 0
-
+ 
 def fmt_num(v):
     return "0" if v == 0 else f"{v:,}"
-
+ 
 def unique_vals(df, col):
     if col is None:
         return []
     return sorted([v for v in df[col].unique()
                    if str(v).strip() and str(v) not in ("nan", "<NA>", "")])
-
-
+ 
+ 
 # ─── 테이블 HTML 생성 ────────────────────────────────────────────
 def build_table(df, months, cm):
     month_ths = "".join(
@@ -214,13 +214,13 @@ def build_table(df, months, cm):
         <th style="min-width:40px">통화</th>
         <th style="min-width:50px">금액</th>
     </tr></thead>"""
-
+ 
     badge_map = {"신상품": "신상품", "단종대기": "단종대기", "진행": "진행"}
     rs      = len(ROW_TYPES)
     parts   = []
     df_cols = set(df.columns)
     mc      = {rt: [f"{rt}_{m}" for m in months] for rt in ROW_TYPES}
-
+ 
     for idx in range(len(df)):
         row = df.iloc[idx]
         품명     = str(row[cm["품명"]]) if cm["품명"] else ""
@@ -235,16 +235,16 @@ def build_table(df, months, cm):
         sn_통화  = str(row[cm["SN통화"]]) if cm["SN통화"] else ""
         sn_금액  = safe_int(row[cm["SN금액"]]) if cm["SN금액"] else 0
         사진주소 = str(row[cm["사진주소"]]).strip() if cm["사진주소"] else ""
-
+ 
         badge_cls = badge_map.get(상태, "기타")
         seq = idx + 1
-
+ 
         if 사진주소.startswith("http"):
             img_html = (f'<img src="{사진주소}" '
                         f'onerror="this.style.display=\'none\'" alt="{품번}"/>')
         else:
             img_html = '<span style="color:#ccc;font-size:18px">📷</span>'
-
+ 
         first_cells = (
             f'<td class="center" rowspan="{rs}">{seq}</td>'
             f'<td class="img-cell" rowspan="{rs}">{img_html}</td>'
@@ -261,7 +261,7 @@ def build_table(df, months, cm):
             f'<td class="num" rowspan="{rs}">{fmt_num(미입고_v)}</td>'
             f'<td class="left" rowspan="{rs}" style="font-size:10px">{입고예정}</td>'
         )
-
+ 
         for ri, rt in enumerate(ROW_TYPES):
             is_first = ri == 0
             is_pos   = rt == "POS판매"
@@ -272,19 +272,19 @@ def build_table(df, months, cm):
                 tr_cls = ' class="prod-first"'
             elif is_pos:
                 tr_cls = ' class="row-pos"'
-
+ 
             cells = []
             if is_first:
                 cells.append(first_cells)
             cells.append(f'<td class="type-label">{rt}</td>')
-
+ 
             for col_name in mc[rt]:
                 v = safe_int(row[col_name]) if col_name in df_cols else 0
                 cells.append('<td class="num zero-val">0</td>' if v == 0
                              else f'<td class="num">{v:,}</td>')
-
+ 
             parts.append(f"<tr{tr_cls}>{''.join(cells)}</tr>")
-
+ 
         # 구입가 요약 행
         empty_tds = '<td></td>' * len(months)
         parts.append(
@@ -295,27 +295,27 @@ def build_table(df, months, cm):
             f'<td class="num">{fmt_num(미입고_v)}</td>'
             f'<td></td><td></td>{empty_tds}</tr>'
         )
-
+ 
     return (f'<div class="tbl-wrap">'
             f'<table class="main-tbl">{header}'
             f'<tbody>{"".join(parts)}</tbody>'
             f'</table></div>')
-
-
+ 
+ 
 # ─── 헤더 ───────────────────────────────────────────────────────
 st.markdown(
     '<div class="page-header"><span class="dot">●</span>'
     '<h1>발주관리표2</h1></div>',
     unsafe_allow_html=True)
-
+ 
 # ─── 데이터 로드 ─────────────────────────────────────────────────
 with st.spinner("데이터 불러오는 중..."):
     df_raw = load_data()
-
+ 
 if df_raw.empty:
     st.warning("데이터가 없습니다. BJZ.xlsx 파일을 확인해주세요.")
     st.stop()
-
+ 
 # ─── 컬럼명 파악 ─────────────────────────────────────────────────
 col_담당     = get_col(df_raw, "담당")
 col_대분류   = get_col(df_raw, "대분류")
@@ -335,7 +335,7 @@ col_미입고   = get_col(df_raw, "미입고")
 col_입고예정 = get_col(df_raw, "입고예정")
 col_SN통화   = get_col(df_raw, "통화")
 col_SN금액   = get_col(df_raw, "금액")
-
+ 
 col_map = {
     "품명": col_품명,     "품번": col_품번,     "상태": col_상태,
     "판매가": col_판매가, "구입가": col_구입가,
@@ -344,13 +344,13 @@ col_map = {
     "SN통화": col_SN통화, "SN금액": col_SN금액,
     "사진주소": col_사진주소,
 }
-
+ 
 # ─── 레이아웃: 필터(왼쪽) + 사진(오른쪽) ──────────────────────
 filter_col, photo_col = st.columns([4, 1])
-
+ 
 with filter_col:
     sel_품번검색 = st.text_input("🔎 품번 검색", placeholder="품번 입력 (부분 검색 가능)")
-
+ 
     fc1, fc2, fc3 = st.columns(3)
     with fc1:
         sel_대분류 = st.selectbox("대분류", ["전체"] + unique_vals(df_raw, col_대분류))
@@ -364,7 +364,7 @@ with filter_col:
         if sel_중분류 != "전체" and col_중분류:
             df_f2 = df_f2[df_f2[col_중분류] == sel_중분류]
         sel_소분류 = st.selectbox("소분류", ["전체"] + unique_vals(df_f2, col_소분류))
-
+ 
     fc4, fc5, fc6 = st.columns(3)
     with fc4:
         sel_담당 = st.selectbox("담당자", ["전체"] + unique_vals(df_raw, col_담당))
@@ -372,15 +372,15 @@ with filter_col:
         sel_관계사팀 = st.selectbox("관계사팀", ["전체"] + unique_vals(df_raw, col_관계사팀))
     with fc6:
         sel_업체 = st.selectbox("업체", ["전체"] + unique_vals(df_raw, col_업체명))
-
+ 
     _, btn_col, _ = st.columns([3, 1, 3])
     with btn_col:
         do_search = st.button("🔍 조회", use_container_width=True)
-
+ 
 # ─── 사진 패널 (필터 오른쪽) ────────────────────────────────────
 with photo_col:
     st.markdown("#### 📷 상품 사진")
-
+ 
     if "filtered_df" in st.session_state and col_품번 and col_사진주소:
         df_cur   = st.session_state["filtered_df"]
         if len(df_cur) > 0:
@@ -389,7 +389,7 @@ with photo_col:
                          else [""] * len(품번_list))
             sel_opts  = [f"{p} | {str(n)[:15]}"
                          for p, n in zip(품번_list, 품명_list)]
-
+ 
             sel_idx = st.selectbox("품번 선택", range(len(sel_opts)),
                                    format_func=lambda i: sel_opts[i],
                                    key="photo_select")
@@ -408,9 +408,9 @@ with photo_col:
             'border:1px dashed #ddd;border-radius:6px;font-size:11px">'
             '조회 후<br>품번을 선택하면<br>사진이 표시됩니다</div>',
             unsafe_allow_html=True)
-
+ 
 st.markdown("---")
-
+ 
 # ─── 필터 적용 ──────────────────────────────────────────────────
 if do_search:
     df = df_raw.copy()
@@ -431,20 +431,20 @@ if do_search:
     df = df.reset_index(drop=True)
     st.session_state["filtered_df"] = df
     st.rerun()
-
+ 
 if "filtered_df" not in st.session_state:
     st.info("필터를 선택한 후 🔍 조회 버튼을 눌러주세요.")
     st.stop()
-
+ 
 df        = st.session_state["filtered_df"]
 sel_months = detect_months(df_raw)
-
+ 
 st.markdown(f"**조회 결과: 총 {len(df)}개 상품**")
-
+ 
 if df.empty:
     st.info("조회 결과가 없습니다.")
     st.stop()
-
+ 
 # ─── 테이블 렌더링 ──────────────────────────────────────────────
 table_html = build_table(df, sel_months, col_map)
 st.markdown(table_html, unsafe_allow_html=True)
