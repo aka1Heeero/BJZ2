@@ -428,7 +428,6 @@ def build_table(df, months):
         <th rowspan="2" style="min-width:44px">발주<br>미입고</th>
         <th rowspan="2" style="min-width:140px">상태정보</th>
         <th rowspan="2" style="min-width:52px">구분</th>
-        <th rowspan="2" style="min-width:46px">합계</th>
         {month_ths_row1}
       </tr>
       <tr>
@@ -501,10 +500,6 @@ def build_table(df, months):
             # 구분 라벨
             cells += f'<td class="type-label">{rt}</td>'
 
-            # 합계
-            total = sum(get_monthly_val(row, rt, m) for m in months)
-            cells += f'<td class="num {"zero-val" if total == 0 else ""}">{fmt_num(total)}</td>'
-
             # 월별 값
             for m in months:
                 v = get_monthly_val(row, rt, m)
@@ -525,7 +520,7 @@ def build_table(df, months):
             f'<td></td><td></td>'                                     # 가용재고, 일평균출고
             f'<td class="num">{fmt_num(미입고)}</td>'                 # 발주미입고
             f'<td></td>'                                              # 상태정보
-            f'<td></td><td></td>'                                     # 구분, 합계
+            f'<td></td>'                                              # 구분
             f'{empty_month_tds}'
             f'</tr>\n'
         )
