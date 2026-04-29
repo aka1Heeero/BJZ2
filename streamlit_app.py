@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import streamlit.components.v1 as components
+from datetime import datetime, timedelta
 
 st.set_page_config(
     page_title="BJZ2",
@@ -31,7 +32,7 @@ def check_password():
 if not check_password():
     st.stop()
 
-# ─── CSS (st.markdown용 - 필터/버튼 스타일) ────────────────────
+# ─── CSS ───────────────────────────────────────────────────────
 st.markdown("""
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
@@ -46,6 +47,17 @@ st.markdown("""
 
 # ─── xlsx 파일 로드 ─────────────────────────────────────────────
 DATA_FILE = "BJZ.xlsx"
+
+def excel_serial_to_ym(val):
+    """엑셀 시리얼 숫자 → YY/MM 문자열 변환"""
+    try:
+        n = int(float(str(val)))
+        if 40000 < n < 60000:  # 엑셀 날짜 범위
+            dt = datetime(1899, 12, 30) + timedelta(days=n)
+            return dt.strftime("%y/%m")
+    except:
+        pass
+    return None
 
 @st.cache_data
 def load_data():
@@ -73,8 +85,16 @@ def load_data():
             if cat and cat not in ("nan", ""):
                 last_cat = cat
 
+            # YY/MM 패턴 감지 (텍스트형)
             is_month = (len(sub) == 5 and sub[2] == "/" and
                         sub[:2].isdigit() and sub[3:].isdigit())
+
+            # 엑셀 시리얼 숫자 → YY/MM 변환 시도
+            if not is_month:
+                converted = excel_serial_to_ym(sub)
+                if converted:
+                    sub = converted
+                    is_month = True
 
             if is_month and last_cat and last_cat not in ("구분", ""):
                 col_name = f"{last_cat}_{sub}"
@@ -155,12 +175,12 @@ def unique_vals(df, col):
     return sorted([v for v in df[col].unique()
                    if str(v).strip() and str(v) not in ("nan", "<NA>", "")])
 
-# ─── 테이블 HTML 생성 ───────────────────────────────────────────
+# ─── 테이블 CSS ─────────────────────────────────────────────────
 TABLE_CSS = """
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
   * { font-family: 'Noto Sans KR', sans-serif; box-sizing: border-box; }
-  body { margin: 0; padding: 0; background: #f5f5f5; }
+  body { margin:0; padding:0; background:#f5f5f5; }
   .tbl-wrap { overflow-x:auto; margin-top:6px; }
   table.main-tbl { border-collapse:collapse; width:100%; font-size:11px; border:1px solid #999; }
   table.main-tbl th { background:#dce6f1; color:#1a1a1a; font-weight:600; padding:5px 6px; border:1px solid #bbb; text-align:center; white-space:nowrap; position:sticky; top:0; z-index:2; }
@@ -174,19 +194,45 @@ TABLE_CSS = """
   table.main-tbl td.type-label { text-align:center; font-weight:500; background:#f8f8f8; min-width:55px; }
   table.main-tbl td.zero-val { color:#ccc; }
   table.main-tbl tr.owner-row td { background:#f0f4f8; font-size:10px; color:#555; font-weight:500; border-top:1px dashed #bbb; }
-  table.main-tbl td.img-cell { text-align:center; vertical-align:middle; padding:3px; background:#fff; }
-  table.main-tbl td.img-cell img { width:60px; height:60px; object-fit:contain; border:1px solid #e0e0e0; border-radius:3px; background:#fff; display:block; margin:auto; }
+  table.main-tbl td.img-cell { text-align:center; vertical-align:middle; padding:3px; background:#fff; cursor:pointer; }
+  table.main-tbl td.img-cell img { width:60px; height:60px; object-fit:contain; border:1px solid #e0e0e0; border-radius:3px; background:#fff; display:block; margin:auto; transition:transform 0.1s; }
+  table.main-tbl td.img-cell img:hover { transform:scale(1.1); border-color:#1a3a5c; }
   table.main-tbl th.img-th { min-width:68px; }
   .st-badge { display:inline-block; padding:1px 5px; border-radius:2px; font-size:10px; font-weight:600; }
   .st-badge.신상품 { background:#d4edda; color:#155724; }
   .st-badge.단종대기 { background:#f8d7da; color:#721c24; }
   .st-badge.진행 { background:#e2e3e5; color:#383d41; }
   .st-badge.기타 { background:#fff3cd; color:#856404; }
-  tr.clickable-row { cursor: pointer; }
-  tr.clickable-row:hover td { background:#fffde7 !important; }
+
+  /* 사진 패널 */
+  #photo-panel {
+    position: sticky; top: 10px;
+    background:#fff; border:1px solid #ddd; border-radius:8px;
+    padding:12px; text-align:center; min-height:200px;
+  }
+  #photo-panel h4 { margin:0 0 8px 0; font-size:12px; color:#1a3a5c; }
+  #photo-panel img { max-width:100%; max-height:220px; object-fit:contain;
+    border:1px solid #eee; border-radius:4px; cursor:pointer; }
+  #photo-panel .pno { font-family:monospace; font-size:12px; color:#555; margin-bottom:2px; }
+  #photo-panel .pname { font-size:11px; color:#333; margin-bottom:8px; }
+  #photo-panel .noimg { color:#aaa; padding:40px 0; font-size:12px; }
+
+  /* 확대 모달 */
+  #zoom-modal {
+    display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+    background:rgba(0,0,0,0.85); z-index:9999;
+    align-items:center; justify-content:center;
+  }
+  #zoom-modal img { max-width:90%; max-height:90%; object-fit:contain;
+    border-radius:4px; box-shadow:0 0 30px rgba(0,0,0,0.5); }
+  #zoom-modal .close-btn {
+    position:fixed; top:20px; right:30px; color:#fff;
+    font-size:36px; cursor:pointer; line-height:1;
+  }
 </style>
 """
 
+# ─── 테이블 HTML 생성 ───────────────────────────────────────────
 def build_table(df, months, cm):
     month_ths = "".join(
         f'<th rowspan="2" style="min-width:44px;text-align:center">{m}</th>'
@@ -235,22 +281,24 @@ def build_table(df, months, cm):
         badge_cls = badge_map.get(상태, "기타")
         seq = idx + 1
 
+        safe_품명 = 품명.replace("'", "\\'").replace('"', '&quot;')
+        safe_url  = 사진주소.replace("'", "\\'")
+
         if 사진주소.startswith("http"):
-            img_html = (f'<img src="{사진주소}" '
-                        f'onerror="this.style.display=\'none\'" alt="{품번}"/>')
+            img_html = (
+                f'<img src="{사진주소}" '
+                f'onclick="zoomImg(\'{safe_url}\')" '
+                f'onmouseover="showPanel(\'{safe_url}\',\'{품번}\',\'{safe_품명[:20]}\')" '
+                f'onerror="this.style.display=\'none\'" alt="{품번}"/>'
+            )
         else:
             img_html = '<span style="color:#ccc;font-size:18px">📷</span>'
-
-        # 행 클릭 시 사진 팝업
-        click_js = f"onclick=\"showPhoto('{사진주소}', '{품번}', '{품명[:20]}')\""
 
         first_cells = (
             f'<td class="center" rowspan="{rs}">{seq}</td>'
             f'<td class="img-cell" rowspan="{rs}">{img_html}</td>'
-            f'<td class="center" rowspan="{rs}">'
-            f'<span class="st-badge {badge_cls}">{상태}</span></td>'
-            f'<td class="center" rowspan="{rs}" '
-            f'style="font-family:monospace;font-size:10px">{품번}</td>'
+            f'<td class="center" rowspan="{rs}"><span class="st-badge {badge_cls}">{상태}</span></td>'
+            f'<td class="center" rowspan="{rs}" style="font-family:monospace;font-size:10px">{품번}</td>'
             f'<td class="left" rowspan="{rs}" style="font-size:10px">{품명}</td>'
             f'<td class="num" rowspan="{rs}">{fmt_num(safe_int(판매가))}</td>'
             f'<td class="center" rowspan="{rs}" style="font-size:10px">{sn_통화}</td>'
@@ -264,13 +312,13 @@ def build_table(df, months, cm):
         for ri, rt in enumerate(ROW_TYPES):
             is_first = ri == 0
             is_pos   = rt == "POS판매"
-            tr_cls   = "clickable-row"
+            tr_cls = ""
             if is_first and is_pos:
-                tr_cls += " prod-first row-pos"
+                tr_cls = ' class="prod-first row-pos"'
             elif is_first:
-                tr_cls += " prod-first"
+                tr_cls = ' class="prod-first"'
             elif is_pos:
-                tr_cls += " row-pos"
+                tr_cls = ' class="row-pos"'
 
             cells = []
             if is_first:
@@ -282,7 +330,7 @@ def build_table(df, months, cm):
                 cells.append('<td class="num zero-val">0</td>' if v == 0
                              else f'<td class="num">{v:,}</td>')
 
-            parts.append(f'<tr class="{tr_cls}" {click_js}>{"".join(cells)}</tr>')
+            parts.append(f"<tr{tr_cls}>{''.join(cells)}</tr>")
 
         empty_tds = '<td></td>' * len(months)
         parts.append(
@@ -344,34 +392,51 @@ col_map = {
     "사진주소": col_사진주소,
 }
 
-# ─── 필터 UI ────────────────────────────────────────────────────
-sel_품번검색 = st.text_input("🔎 품번 검색", placeholder="품번 입력 (부분 검색 가능)")
+# ─── 필터 UI + 사진 패널 ────────────────────────────────────────
+filter_col, photo_col = st.columns([4, 1])
 
-fc1, fc2, fc3 = st.columns(3)
-with fc1:
-    sel_대분류 = st.selectbox("대분류", ["전체"] + unique_vals(df_raw, col_대분류))
-with fc2:
-    df_f = df_raw if sel_대분류 == "전체" else df_raw[df_raw[col_대분류] == sel_대분류]
-    sel_중분류 = st.selectbox("중분류", ["전체"] + unique_vals(df_f, col_중분류))
-with fc3:
-    df_f2 = df_raw
-    if sel_대분류 != "전체" and col_대분류:
-        df_f2 = df_f2[df_f2[col_대분류] == sel_대분류]
-    if sel_중분류 != "전체" and col_중분류:
-        df_f2 = df_f2[df_f2[col_중분류] == sel_중분류]
-    sel_소분류 = st.selectbox("소분류", ["전체"] + unique_vals(df_f2, col_소분류))
+with filter_col:
+    sel_품번검색 = st.text_input("🔎 품번 검색", placeholder="품번 입력 (부분 검색 가능)")
 
-fc4, fc5, fc6 = st.columns(3)
-with fc4:
-    sel_담당 = st.selectbox("담당자", ["전체"] + unique_vals(df_raw, col_담당))
-with fc5:
-    sel_관계사팀 = st.selectbox("관계사팀", ["전체"] + unique_vals(df_raw, col_관계사팀))
-with fc6:
-    sel_업체 = st.selectbox("업체", ["전체"] + unique_vals(df_raw, col_업체명))
+    fc1, fc2, fc3 = st.columns(3)
+    with fc1:
+        sel_대분류 = st.selectbox("대분류", ["전체"] + unique_vals(df_raw, col_대분류))
+    with fc2:
+        df_f = df_raw if sel_대분류 == "전체" else df_raw[df_raw[col_대분류] == sel_대분류]
+        sel_중분류 = st.selectbox("중분류", ["전체"] + unique_vals(df_f, col_중분류))
+    with fc3:
+        df_f2 = df_raw
+        if sel_대분류 != "전체" and col_대분류:
+            df_f2 = df_f2[df_f2[col_대분류] == sel_대분류]
+        if sel_중분류 != "전체" and col_중분류:
+            df_f2 = df_f2[df_f2[col_중분류] == sel_중분류]
+        sel_소분류 = st.selectbox("소분류", ["전체"] + unique_vals(df_f2, col_소분류))
 
-_, btn_col, _ = st.columns([3, 1, 3])
-with btn_col:
-    do_search = st.button("🔍 조회", use_container_width=True)
+    fc4, fc5, fc6 = st.columns(3)
+    with fc4:
+        sel_담당 = st.selectbox("담당자", ["전체"] + unique_vals(df_raw, col_담당))
+    with fc5:
+        sel_관계사팀 = st.selectbox("관계사팀", ["전체"] + unique_vals(df_raw, col_관계사팀))
+    with fc6:
+        sel_업체 = st.selectbox("업체", ["전체"] + unique_vals(df_raw, col_업체명))
+
+    _, btn_col, _ = st.columns([3, 1, 3])
+    with btn_col:
+        do_search = st.button("🔍 조회", use_container_width=True)
+
+with photo_col:
+    # 사진 패널 - components.html로 JS와 연동
+    st.markdown("""
+        <div id="photo-panel">
+          <h4>📷 상품 사진</h4>
+          <div class="noimg" id="panel-noimg">사진 위에 마우스를 올리면<br>여기에 표시됩니다</div>
+          <div id="panel-pno" class="pno" style="display:none"></div>
+          <div id="panel-pname" class="pname" style="display:none"></div>
+          <img id="panel-img" src="" style="display:none"
+            onclick="zoomImg(this.src)"
+            onerror="this.style.display='none';document.getElementById('panel-noimg').style.display='block'"/>
+        </div>
+    """, unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -409,50 +474,53 @@ if df.empty:
     st.info("조회 결과가 없습니다.")
     st.stop()
 
-# ─── 테이블 렌더링 (components.html 사용) ───────────────────────
+# ─── 테이블 렌더링 ──────────────────────────────────────────────
 table_body = build_table(df, sel_months, col_map)
 
-# 행 클릭 시 사진 팝업 JavaScript
-popup_js = """
-<div id="photo-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
-  background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;">
-  <div style="background:#fff;border-radius:8px;padding:20px;max-width:400px;width:90%;
-    position:relative;text-align:center;">
-    <button onclick="closeModal()" style="position:absolute;top:8px;right:12px;
-      border:none;background:none;font-size:20px;cursor:pointer;">✕</button>
-    <div id="modal-pno" style="font-family:monospace;font-size:13px;color:#555;margin-bottom:4px"></div>
-    <div id="modal-pname" style="font-size:12px;color:#333;margin-bottom:12px"></div>
-    <img id="modal-img" src="" style="max-width:100%;max-height:300px;object-fit:contain;
-      border:1px solid #eee;border-radius:4px;" onerror="this.style.display='none'"/>
-    <div id="modal-noimg" style="display:none;color:#aaa;padding:40px;font-size:13px">사진 없음</div>
-  </div>
+SCRIPTS = """
+<!-- 확대 모달 -->
+<div id="zoom-modal" onclick="closeZoom()">
+  <span class="close-btn">✕</span>
+  <img id="zoom-img" src="" onclick="event.stopPropagation()"/>
 </div>
+
 <script>
-function showPhoto(url, pno, pname) {
-  document.getElementById('modal-pno').innerText = pno;
-  document.getElementById('modal-pname').innerText = pname;
-  var img = document.getElementById('modal-img');
-  var noimg = document.getElementById('modal-noimg');
-  if (url && url.startsWith('http')) {
-    img.src = url;
-    img.style.display = 'block';
-    noimg.style.display = 'none';
-  } else {
-    img.style.display = 'none';
-    noimg.style.display = 'block';
-  }
-  document.getElementById('photo-modal').style.display = 'flex';
+// 사진 패널 업데이트 (마우스오버)
+function showPanel(url, pno, pname) {
+  try {
+    var panel = window.parent.document.getElementById('panel-img');
+    var noimg = window.parent.document.getElementById('panel-noimg');
+    var pnoEl = window.parent.document.getElementById('panel-pno');
+    var pnameEl = window.parent.document.getElementById('panel-pname');
+    if (panel && url && url.startsWith('http')) {
+      panel.src = url;
+      panel.style.display = 'block';
+      noimg.style.display = 'none';
+      pnoEl.innerText = pno;
+      pnoEl.style.display = 'block';
+      pnameEl.innerText = pname;
+      pnameEl.style.display = 'block';
+    }
+  } catch(e) {}
 }
-function closeModal() {
-  document.getElementById('photo-modal').style.display = 'none';
+
+// 확대 모달
+function zoomImg(url) {
+  if (!url || !url.startsWith('http')) return;
+  document.getElementById('zoom-img').src = url;
+  document.getElementById('zoom-modal').style.display = 'flex';
 }
+function closeZoom() {
+  document.getElementById('zoom-modal').style.display = 'none';
+}
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeZoom();
+});
 </script>
 """
 
-full_html = TABLE_CSS + popup_js + table_body
-
-# 행 수에 따라 높이 동적 계산 (최소 400, 최대 2000)
 row_count = len(df)
-height = min(max(400, row_count * 80), 2000)
+height = min(max(400, row_count * 80), 3000)
 
+full_html = TABLE_CSS + SCRIPTS + table_body
 components.html(full_html, height=height, scrolling=True)
