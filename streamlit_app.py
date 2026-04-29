@@ -16,7 +16,7 @@ def check_password():
         st.session_state["authenticated"] = False
     if st.session_state["authenticated"]:
         return True
-    st.markdown("<h2 style='text-align:center;margin-top:80px'>🔒 Online-BJG2</h2>",
+    st.markdown("<h2 style='text-align:center;margin-top:80px'>🔒 발주관리표2</h2>",
                 unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1, 1])
     with c2:
@@ -49,20 +49,11 @@ st.markdown("""
 DATA_FILE = "BJZ.xlsx"
 
 def yyyymm_to_yymm(val):
-    """
-    여러 형태의 월 값을 YY/MM 문자열로 변환
-    - '202411' → '24/11'
-    - 엑셀 시리얼 숫자(예: 45000) → YY/MM
-    - 이미 'YY/MM' 형식이면 그대로 반환
-    """
     s = str(val).strip()
-    # 이미 YY/MM 형식
     if len(s) == 5 and s[2] == "/" and s[:2].isdigit() and s[3:].isdigit():
         return s
-    # YYYYMM 형식 (6자리 숫자)
     if len(s) == 6 and s.isdigit():
         return s[2:4] + "/" + s[4:6]
-    # 엑셀 시리얼 숫자 → 날짜
     try:
         n = int(float(s))
         if 40000 < n < 60000:
@@ -79,16 +70,12 @@ def load_data():
         if len(raw) < 3:
             return pd.DataFrame()
 
-        row0 = [str(v).strip() if pd.notna(v) and str(v) != "nan" else ""
-                for v in raw.iloc[0]]
-        row1 = [str(v).strip().replace("\n", " ") if pd.notna(v) and str(v) != "nan" else ""
-                for v in raw.iloc[1]]
+        row0 = [str(v).strip() if pd.notna(v) and str(v) != "nan" else "" for v in raw.iloc[0]]
+        row1 = [str(v).strip().replace("\n", " ") if pd.notna(v) and str(v) != "nan" else "" for v in raw.iloc[1]]
 
         max_cols = raw.shape[1]
-        while len(row0) < max_cols:
-            row0.append("")
-        while len(row1) < max_cols:
-            row1.append("")
+        while len(row0) < max_cols: row0.append("")
+        while len(row1) < max_cols: row1.append("")
 
         columns = []
         last_cat = ""
@@ -97,19 +84,14 @@ def load_data():
             sub = row1[i]
             if cat and cat not in ("nan", ""):
                 last_cat = cat
-
-            # YY/MM 변환 시도
             converted = yyyymm_to_yymm(sub)
             is_month = converted is not None
-
             if is_month:
                 sub = converted
-
             if is_month and last_cat and last_cat not in ("구분", ""):
                 col_name = f"{last_cat}_{sub}"
             else:
                 col_name = sub if sub else f"_col_{i}"
-
             base = col_name
             n = 2
             while col_name in columns:
@@ -120,7 +102,6 @@ def load_data():
         df = pd.DataFrame(raw.iloc[2:].values, columns=columns)
         df = df.astype(str).replace("nan", "").replace("<NA>", "")
 
-        # 품번 컬럼명 찾기 (공백/개행 제거 후 매칭)
         품번_col = None
         for c in df.columns:
             if c.strip().replace(" ", "").replace("\n", "") == "품번":
@@ -176,8 +157,7 @@ def get_col(df, *names):
 
 def safe_int(v):
     try:
-        if v in ("", None, "nan", "<NA>"):
-            return 0
+        if v in ("", None, "nan", "<NA>"): return 0
         return int(float(str(v).replace(",", "")))
     except:
         return 0
@@ -186,20 +166,38 @@ def fmt_num(v):
     return "0" if v == 0 else f"{v:,}"
 
 def unique_vals(df, col):
-    if col is None:
-        return []
+    if col is None: return []
     return sorted([v for v in df[col].unique()
                    if str(v).strip() and str(v) not in ("nan", "<NA>", "")])
 
-# ─── 테이블 CSS ─────────────────────────────────────────────────
+# ─── 테이블 CSS (② 헤더 행 고정 포함) ─────────────────────────
 TABLE_CSS = """
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
   * { font-family: 'Noto Sans KR', sans-serif; box-sizing: border-box; }
   body { margin:0; padding:0; background:#f5f5f5; }
-  .tbl-wrap { overflow-x:auto; margin-top:6px; }
+
+  /* ② 헤더 고정: wrap에 overflow + max-height */
+  .tbl-wrap {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: calc(100vh - 20px);
+    margin-top: 6px;
+    position: relative;
+  }
+
   table.main-tbl { border-collapse:collapse; width:100%; font-size:11px; border:1px solid #999; }
-  table.main-tbl th { background:#dce6f1; color:#1a1a1a; font-weight:600; padding:5px 6px; border:1px solid #bbb; text-align:center; white-space:nowrap; position:sticky; top:0; z-index:2; }
+
+  /* ② sticky header */
+  table.main-tbl thead th {
+    background:#dce6f1; color:#1a1a1a; font-weight:600;
+    padding:5px 6px; border:1px solid #bbb; text-align:center;
+    white-space:nowrap; position:sticky; z-index:10;
+  }
+  /* 2행 헤더: 1행은 top:0, 2행은 1행 높이(27px) 아래 */
+  table.main-tbl thead tr:nth-child(1) th { top: 0; }
+  table.main-tbl thead tr:nth-child(2) th { top: 27px; }
+
   table.main-tbl td { padding:3px 5px; border:1px solid #ccc; white-space:nowrap; font-size:11px; color:#333; }
   table.main-tbl td.num { text-align:right; }
   table.main-tbl td.center { text-align:center; }
@@ -276,7 +274,6 @@ def build_table(df, months, cm):
         품번     = str(row[cm["품번"]]) if cm["품번"] else ""
         상태     = str(row[cm["상태"]]) if cm["상태"] else ""
         판매가   = str(row[cm["판매가"]]) if cm["판매가"] else ""
-        구입가   = str(row[cm["구입가"]]) if cm["구입가"] else ""
         미입고_v = safe_int(row[cm["미입고"]]) if cm["미입고"] else 0
         입고예정 = str(row[cm["입고예정"]]) if cm["입고예정"] else ""
         정상재고 = safe_int(row[cm["정상재고"]]) if cm["정상재고"] else 0
@@ -319,12 +316,9 @@ def build_table(df, months, cm):
             is_first = ri == 0
             is_pos   = rt == "POS판매"
             tr_cls = ""
-            if is_first and is_pos:
-                tr_cls = ' class="prod-first row-pos"'
-            elif is_first:
-                tr_cls = ' class="prod-first"'
-            elif is_pos:
-                tr_cls = ' class="row-pos"'
+            if is_first and is_pos:   tr_cls = ' class="prod-first row-pos"'
+            elif is_first:            tr_cls = ' class="prod-first"'
+            elif is_pos:              tr_cls = ' class="row-pos"'
 
             cells = []
             if is_first:
@@ -337,9 +331,6 @@ def build_table(df, months, cm):
                              else f'<td class="num">{v:,}</td>')
 
             parts.append(f"<tr{tr_cls}>{''.join(cells)}</tr>")
-
-        # ── [수정 2] owner-row(구입가 표시 줄) 완전 제거 ──
-        # 기존 코드에서 품번 아래에 중복으로 한 줄이 나오던 원인이었던 owner-row를 삭제합니다.
 
     return (f'<div class="tbl-wrap">'
             f'<table class="main-tbl">{header}'
@@ -364,9 +355,7 @@ if df_raw.empty:
 
 # ─── 컬럼명 파악 ────────────────────────────────────────────────
 col_담당     = get_col(df_raw, "담당")
-col_대분류   = get_col(df_raw, "대분류")
 col_중분류   = get_col(df_raw, "중분류")
-col_소분류   = get_col(df_raw, "소분류")
 col_품명     = get_col(df_raw, "품명")
 col_품번     = get_col(df_raw, "품번")
 col_상태     = get_col(df_raw, "상태")
@@ -374,7 +363,6 @@ col_판매가   = get_col(df_raw, "판매가")
 col_구입가   = get_col(df_raw, "구입가")
 col_사진주소 = get_col(df_raw, "사진주소")
 col_업체명   = get_col(df_raw, "업체명")
-col_관계사팀 = get_col(df_raw, "관계사팀")
 col_정상재고 = get_col(df_raw, "정상재고", "정상 재고")
 col_일출고량 = get_col(df_raw, "일출고량", "일출고")
 col_미입고   = get_col(df_raw, "미입고")
@@ -391,116 +379,96 @@ col_map = {
     "사진주소": col_사진주소,
 }
 
-# ─── [수정 3] 사진 패널: 고정 크기 + 우상단 고정 레이아웃 ────────
-# photo_panel_html은 Streamlit 컬럼 밖에서 st.markdown으로 렌더링
-# 테이블 iframe 내 JS → window.parent DOM 조작으로 패널 업데이트
-
-PHOTO_PANEL_CSS = """
+# ─── ③ 사진 패널 HTML (iframe으로 렌더링, JS로 업데이트) ─────────
+PHOTO_PANEL_HTML = """
 <style>
-#photo-fixed-panel {
-  position: fixed;
-  top: 70px;
-  right: 20px;
-  width: 200px;
-  height: 240px;
-  background: #fff;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 10px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.12);
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-#photo-fixed-panel h4 {
-  margin: 0 0 6px 0;
-  font-size: 11px;
-  color: #1a3a5c;
-  font-weight: 600;
-  width: 100%;
-  text-align: center;
-}
-#panel-img-wrap {
-  width: 160px;
-  height: 160px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #eee;
-  border-radius: 4px;
-  background: #fafafa;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-#panel-img-wrap img {
-  max-width: 160px;
-  max-height: 160px;
-  object-fit: contain;
-  cursor: pointer;
-}
-#panel-pno  { font-family:monospace; font-size:10px; color:#555; margin-top:4px; text-align:center; }
-#panel-pname { font-size:10px; color:#333; text-align:center; max-width:180px;
-               overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-#panel-noimg { color:#aaa; font-size:11px; text-align:center; padding: 20px 0; }
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600&display=swap');
+  * { font-family:'Noto Sans KR',sans-serif; box-sizing:border-box; margin:0; padding:0; }
+  body { background:transparent; overflow:hidden; }
+  #panel-wrap {
+    width:100%; height:215px; background:#fff;
+    border:1px solid #ddd; border-radius:8px; padding:8px;
+    display:flex; flex-direction:column; align-items:center;
+    box-shadow:0 1px 6px rgba(0,0,0,0.09);
+  }
+  h4 { font-size:11px; color:#1a3a5c; font-weight:600; margin-bottom:5px; }
+  #panel-img-wrap {
+    width:145px; height:145px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    border:1px solid #eee; border-radius:4px;
+    background:#fafafa; overflow:hidden;
+  }
+  #panel-img-wrap img { max-width:145px; max-height:145px; object-fit:contain; cursor:pointer; }
+  #panel-noimg { color:#bbb; font-size:11px; text-align:center; line-height:1.6; }
+  #panel-pno   { font-family:monospace; font-size:10px; color:#666; margin-top:3px; }
+  #panel-pname { font-size:10px; color:#333; text-align:center;
+                 max-width:145px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 </style>
-
-<div id="photo-fixed-panel">
+<div id="panel-wrap">
   <h4>📷 상품 사진</h4>
   <div id="panel-img-wrap">
-    <div id="panel-noimg">사진을 클릭하면<br>여기에 표시됩니다</div>
+    <div id="panel-noimg">사진 클릭 시<br>표시됩니다</div>
     <img id="panel-img" src="" style="display:none"
-      onclick="document.getElementById('zoom-modal-outer').style.display='flex';
-               document.getElementById('zoom-img-outer').src=this.src;"
-      onerror="this.style.display='none';document.getElementById('panel-noimg').style.display='block'"/>
+      onclick="openZoom(this.src)"
+      onerror="this.style.display='none';
+               document.getElementById('panel-noimg').style.display='block'"/>
   </div>
   <div id="panel-pno"></div>
   <div id="panel-pname"></div>
 </div>
-
-<!-- 확대 모달 (패널 이미지 클릭용) -->
-<div id="zoom-modal-outer" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
-  background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;"
-  onclick="if(event.target===this)this.style.display='none'">
-  <span onclick="document.getElementById('zoom-modal-outer').style.display='none'"
-    style="position:fixed;top:16px;right:16px;color:#fff;font-size:28px;cursor:pointer;
-    background:rgba(0,0,0,0.5);border-radius:50%;width:48px;height:48px;
-    display:flex;align-items:center;justify-content:center;">✕</span>
-  <img id="zoom-img-outer" src="" style="max-width:90%;max-height:85%;object-fit:contain;
-    border-radius:4px;box-shadow:0 0 30px rgba(0,0,0,0.5)"/>
-</div>
+<script>
+function openZoom(url) {
+  try {
+    var doc = window.parent.document;
+    doc.getElementById('zoom-img-outer').src = url;
+    doc.getElementById('zoom-modal-outer').style.display = 'flex';
+  } catch(e) {}
+}
+</script>
 """
 
-st.markdown(PHOTO_PANEL_CSS, unsafe_allow_html=True)
+# ─── 확대 모달 (Streamlit 페이지 레벨) ───────────────────────────
+st.markdown("""
+<div id="zoom-modal-outer"
+  style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
+         background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;"
+  onclick="if(event.target===this||event.target.id==='zoom-img-outer')
+           this.style.display='none'">
+  <span onclick="document.getElementById('zoom-modal-outer').style.display='none'"
+    style="position:fixed;top:16px;right:16px;color:#fff;font-size:28px;cursor:pointer;
+           background:rgba(0,0,0,0.5);border-radius:50%;width:48px;height:48px;
+           display:flex;align-items:center;justify-content:center;z-index:10000">✕</span>
+  <img id="zoom-img-outer" src=""
+    style="max-width:90%;max-height:85%;object-fit:contain;
+           border-radius:4px;box-shadow:0 0 30px rgba(0,0,0,0.5)"/>
+</div>
+""", unsafe_allow_html=True)
 
-# ─── 필터 UI ────────────────────────────────────────────────────
-sel_품번검색 = st.text_input("🔎 품번 검색", placeholder="품번 입력 (부분 검색 가능)")
+# ─── ①③ 필터 UI + 사진 패널 (같은 행 배치) ──────────────────────
+filter_col, photo_col = st.columns([5, 1])
 
-fc1, fc2, fc3 = st.columns(3)
-with fc1:
-    sel_대분류 = st.selectbox("대분류", ["전체"] + unique_vals(df_raw, col_대분류))
-with fc2:
-    df_f = df_raw if sel_대분류 == "전체" else df_raw[df_raw[col_대분류] == sel_대분류]
-    sel_중분류 = st.selectbox("중분류", ["전체"] + unique_vals(df_f, col_중분류))
-with fc3:
-    df_f2 = df_raw
-    if sel_대분류 != "전체" and col_대분류:
-        df_f2 = df_f2[df_f2[col_대분류] == sel_대분류]
-    if sel_중분류 != "전체" and col_중분류:
-        df_f2 = df_f2[df_f2[col_중분류] == sel_중분류]
-    sel_소분류 = st.selectbox("소분류", ["전체"] + unique_vals(df_f2, col_소분류))
+with filter_col:
+    r1c1, r1c2, r1c3 = st.columns(3)
+    with r1c1:
+        sel_품번검색 = st.text_input("🔎 품번 검색", placeholder="품번 입력 (부분 검색)")
+    with r1c2:
+        # ① 대분류 → 진행상태 필터로 교체
+        sel_진행상태 = st.selectbox("진행상태", ["전체", "진행", "신상품", "단종대기"])
+    with r1c3:
+        sel_중분류 = st.selectbox("중분류", ["전체"] + unique_vals(df_raw, col_중분류))
 
-fc4, fc5, fc6 = st.columns(3)
-with fc4:
-    sel_담당 = st.selectbox("담당자", ["전체"] + unique_vals(df_raw, col_담당))
-with fc5:
-    sel_관계사팀 = st.selectbox("관계사팀", ["전체"] + unique_vals(df_raw, col_관계사팀))
-with fc6:
-    sel_업체 = st.selectbox("업체", ["전체"] + unique_vals(df_raw, col_업체명))
+    r2c1, r2c2, r2c3 = st.columns(3)
+    with r2c1:
+        sel_담당 = st.selectbox("담당자", ["전체"] + unique_vals(df_raw, col_담당))
+    with r2c2:
+        sel_업체 = st.selectbox("업체", ["전체"] + unique_vals(df_raw, col_업체명))
+    with r2c3:
+        st.markdown("<div style='height:27px'></div>", unsafe_allow_html=True)
+        do_search = st.button("🔍 조회", use_container_width=True)
 
-_, btn_col, _ = st.columns([3, 1, 3])
-with btn_col:
-    do_search = st.button("🔍 조회", use_container_width=True)
+with photo_col:
+    # ③ 사진 패널을 필터 우측 동일 위치에 배치
+    components.html(PHOTO_PANEL_HTML, height=220)
 
 st.markdown("---")
 
@@ -509,16 +477,12 @@ if do_search:
     df = df_raw.copy()
     if sel_품번검색.strip() and col_품번:
         df = df[df[col_품번].str.contains(sel_품번검색.strip(), case=False, na=False)]
-    if sel_대분류 != "전체" and col_대분류:
-        df = df[df[col_대분류] == sel_대분류]
+    if sel_진행상태 != "전체" and col_상태:
+        df = df[df[col_상태] == sel_진행상태]
     if sel_중분류 != "전체" and col_중분류:
         df = df[df[col_중분류] == sel_중분류]
-    if sel_소분류 != "전체" and col_소분류:
-        df = df[df[col_소분류] == sel_소분류]
     if sel_담당 != "전체" and col_담당:
         df = df[df[col_담당] == sel_담당]
-    if sel_관계사팀 != "전체" and col_관계사팀:
-        df = df[df[col_관계사팀] == sel_관계사팀]
     if sel_업체 != "전체" and col_업체명:
         df = df[df[col_업체명] == sel_업체]
     df = df.reset_index(drop=True)
@@ -541,8 +505,8 @@ if df.empty:
 # ─── 테이블 렌더링 ──────────────────────────────────────────────
 table_body = build_table(df, sel_months, col_map)
 
+# 테이블 내 JS: 사진 클릭 → 사진 패널 iframe 업데이트 + 더블탭 확대
 SCRIPTS = """
-<!-- 테이블 내 확대 모달 -->
 <div id="zoom-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
   background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;">
   <span class="close-btn" ontouchend="closeZoom()" onclick="closeZoom()">✕</span>
@@ -555,29 +519,31 @@ var lastTap = 0;
 function handleImgClick(e, url, pno, pname) {
   e.preventDefault();
   var now = Date.now();
-  // 패널 업데이트 (항상)
   updatePanel(url, pno, pname);
-  // 더블탭이면 확대
   if ((now - lastTap) < 400 && (now - lastTap) > 0) {
     zoomImg(url);
   }
   lastTap = now;
 }
 
-// window.parent DOM 조작으로 Streamlit 페이지의 패널 업데이트
+// 사진 패널 iframe을 찾아서 업데이트
 function updatePanel(url, pno, pname) {
   try {
-    var doc = window.parent.document;
-    var img = doc.getElementById('panel-img');
-    var noimg = doc.getElementById('panel-noimg');
-    var pnoEl = doc.getElementById('panel-pno');
-    var pnameEl = doc.getElementById('panel-pname');
-    if (img && url && url.startsWith('http')) {
-      img.src = url;
-      img.style.display = 'block';
-      noimg.style.display = 'none';
-      if (pnoEl) pnoEl.innerText = pno;
-      if (pnameEl) pnameEl.innerText = pname;
+    var frames = window.parent.document.querySelectorAll('iframe');
+    for (var i = 0; i < frames.length; i++) {
+      try {
+        var fdoc = frames[i].contentDocument || frames[i].contentWindow.document;
+        var img = fdoc.getElementById('panel-img');
+        if (img && url && url.startsWith('http')) {
+          img.src = url;
+          img.style.display = 'block';
+          fdoc.getElementById('panel-noimg').style.display = 'none';
+          var pnoEl = fdoc.getElementById('panel-pno');
+          var pnameEl = fdoc.getElementById('panel-pname');
+          if (pnoEl) pnoEl.innerText = pno;
+          if (pnameEl) pnameEl.innerText = pname;
+        }
+      } catch(e2) {}
     }
   } catch(e) {}
 }
@@ -604,8 +570,5 @@ document.addEventListener('keydown', function(e) {
 </script>
 """
 
-row_count = len(df)
-height = min(max(400, row_count * 80), 3000)
-
 full_html = TABLE_CSS + SCRIPTS + table_body
-components.html(full_html, height=height, scrolling=True)
+components.html(full_html, height=800, scrolling=True)
