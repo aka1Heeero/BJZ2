@@ -16,7 +16,7 @@ def check_password():
         st.session_state["authenticated"] = False
     if st.session_state["authenticated"]:
         return True
-    st.markdown("<h2 style='text-align:center;margin-top:80px'>🔒 발주관리표2</h2>",
+    st.markdown("<h2 style='text-align:center;margin-top:80px'>🔒 Online-BJG2</h2>",
                 unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1, 1])
     with c2:
@@ -48,11 +48,24 @@ st.markdown("""
 # ─── xlsx 파일 로드 ─────────────────────────────────────────────
 DATA_FILE = "BJZ.xlsx"
 
-def excel_serial_to_ym(val):
-    """엑셀 시리얼 숫자 → YY/MM 문자열 변환"""
+def yyyymm_to_yymm(val):
+    """
+    여러 형태의 월 값을 YY/MM 문자열로 변환
+    - '202411' → '24/11'
+    - 엑셀 시리얼 숫자(예: 45000) → YY/MM
+    - 이미 'YY/MM' 형식이면 그대로 반환
+    """
+    s = str(val).strip()
+    # 이미 YY/MM 형식
+    if len(s) == 5 and s[2] == "/" and s[:2].isdigit() and s[3:].isdigit():
+        return s
+    # YYYYMM 형식 (6자리 숫자)
+    if len(s) == 6 and s.isdigit():
+        return s[2:4] + "/" + s[4:6]
+    # 엑셀 시리얼 숫자 → 날짜
     try:
-        n = int(float(str(val)))
-        if 40000 < n < 60000:  # 엑셀 날짜 범위
+        n = int(float(s))
+        if 40000 < n < 60000:
             dt = datetime(1899, 12, 30) + timedelta(days=n)
             return dt.strftime("%y/%m")
     except:
@@ -85,16 +98,12 @@ def load_data():
             if cat and cat not in ("nan", ""):
                 last_cat = cat
 
-            # YY/MM 패턴 감지 (텍스트형)
-            is_month = (len(sub) == 5 and sub[2] == "/" and
-                        sub[:2].isdigit() and sub[3:].isdigit())
+            # YY/MM 변환 시도
+            converted = yyyymm_to_yymm(sub)
+            is_month = converted is not None
 
-            # 엑셀 시리얼 숫자 → YY/MM 변환 시도
-            if not is_month:
-                converted = excel_serial_to_ym(sub)
-                if converted:
-                    sub = converted
-                    is_month = True
+            if is_month:
+                sub = converted
 
             if is_month and last_cat and last_cat not in ("구분", ""):
                 col_name = f"{last_cat}_{sub}"
@@ -111,8 +120,15 @@ def load_data():
         df = pd.DataFrame(raw.iloc[2:].values, columns=columns)
         df = df.astype(str).replace("nan", "").replace("<NA>", "")
 
-        if "품번" in df.columns:
-            df = df[df["품번"].str.strip() != ""]
+        # 품번 컬럼명 찾기 (공백/개행 제거 후 매칭)
+        품번_col = None
+        for c in df.columns:
+            if c.strip().replace(" ", "").replace("\n", "") == "품번":
+                품번_col = c
+                break
+        if 품번_col:
+            df = df[df[품번_col].str.strip() != ""]
+
         return df.reset_index(drop=True)
 
     except FileNotFoundError:
@@ -193,7 +209,6 @@ TABLE_CSS = """
   table.main-tbl tr.row-pos td.type-label { background:#ffcccc; color:#c00; font-weight:700; }
   table.main-tbl td.type-label { text-align:center; font-weight:500; background:#f8f8f8; min-width:55px; }
   table.main-tbl td.zero-val { color:#ccc; }
-  table.main-tbl tr.owner-row td { background:#f0f4f8; font-size:10px; color:#555; font-weight:500; border-top:1px dashed #bbb; }
   table.main-tbl td.img-cell { text-align:center; vertical-align:middle; padding:3px; background:#fff; cursor:pointer; }
   table.main-tbl td.img-cell img { width:60px; height:60px; object-fit:contain; border:1px solid #e0e0e0; border-radius:3px; background:#fff; display:block; margin:auto; transition:transform 0.1s; }
   table.main-tbl td.img-cell img:hover { transform:scale(1.1); border-color:#1a3a5c; }
@@ -203,19 +218,6 @@ TABLE_CSS = """
   .st-badge.단종대기 { background:#f8d7da; color:#721c24; }
   .st-badge.진행 { background:#e2e3e5; color:#383d41; }
   .st-badge.기타 { background:#fff3cd; color:#856404; }
-
-  /* 사진 패널 */
-  #photo-panel {
-    position: sticky; top: 10px;
-    background:#fff; border:1px solid #ddd; border-radius:8px;
-    padding:12px; text-align:center; min-height:200px;
-  }
-  #photo-panel h4 { margin:0 0 8px 0; font-size:12px; color:#1a3a5c; }
-  #photo-panel img { max-width:100%; max-height:220px; object-fit:contain;
-    border:1px solid #eee; border-radius:4px; cursor:pointer; }
-  #photo-panel .pno { font-family:monospace; font-size:12px; color:#555; margin-bottom:2px; }
-  #photo-panel .pname { font-size:11px; color:#333; margin-bottom:8px; }
-  #photo-panel .noimg { color:#aaa; padding:40px 0; font-size:12px; }
 
   /* 확대 모달 */
   #zoom-modal {
@@ -293,7 +295,6 @@ def build_table(df, months, cm):
             img_html = (
                 f'<img src="{사진주소}" '
                 f'onclick="handleImgClick(event, \'{safe_url}\',\'{품번}\',\'{safe_품명[:20]}\')" '
-                f'onmouseover="showPanel(\'{safe_url}\',\'{품번}\',\'{safe_품명[:20]}\')" '
                 f'onerror="this.style.display=\'none\'" alt="{품번}"/>'
             )
         else:
@@ -337,15 +338,8 @@ def build_table(df, months, cm):
 
             parts.append(f"<tr{tr_cls}>{''.join(cells)}</tr>")
 
-        empty_tds = '<td></td>' * len(months)
-        parts.append(
-            f'<tr class="owner-row"><td></td><td></td><td></td><td></td>'
-            f'<td class="left" style="font-size:10px">{품명[:20]}</td>'
-            f'<td class="num">{fmt_num(safe_int(구입가))}</td>'
-            f'<td></td><td></td><td></td><td></td>'
-            f'<td class="num">{fmt_num(미입고_v)}</td>'
-            f'<td></td><td></td>{empty_tds}</tr>'
-        )
+        # ── [수정 2] owner-row(구입가 표시 줄) 완전 제거 ──
+        # 기존 코드에서 품번 아래에 중복으로 한 줄이 나오던 원인이었던 owner-row를 삭제합니다.
 
     return (f'<div class="tbl-wrap">'
             f'<table class="main-tbl">{header}'
@@ -397,51 +391,116 @@ col_map = {
     "사진주소": col_사진주소,
 }
 
-# ─── 필터 UI + 사진 패널 ────────────────────────────────────────
-filter_col, photo_col = st.columns([4, 1])
+# ─── [수정 3] 사진 패널: 고정 크기 + 우상단 고정 레이아웃 ────────
+# photo_panel_html은 Streamlit 컬럼 밖에서 st.markdown으로 렌더링
+# 테이블 iframe 내 JS → window.parent DOM 조작으로 패널 업데이트
 
-with filter_col:
-    sel_품번검색 = st.text_input("🔎 품번 검색", placeholder="품번 입력 (부분 검색 가능)")
+PHOTO_PANEL_CSS = """
+<style>
+#photo-fixed-panel {
+  position: fixed;
+  top: 70px;
+  right: 20px;
+  width: 200px;
+  height: 240px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+#photo-fixed-panel h4 {
+  margin: 0 0 6px 0;
+  font-size: 11px;
+  color: #1a3a5c;
+  font-weight: 600;
+  width: 100%;
+  text-align: center;
+}
+#panel-img-wrap {
+  width: 160px;
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  background: #fafafa;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+#panel-img-wrap img {
+  max-width: 160px;
+  max-height: 160px;
+  object-fit: contain;
+  cursor: pointer;
+}
+#panel-pno  { font-family:monospace; font-size:10px; color:#555; margin-top:4px; text-align:center; }
+#panel-pname { font-size:10px; color:#333; text-align:center; max-width:180px;
+               overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#panel-noimg { color:#aaa; font-size:11px; text-align:center; padding: 20px 0; }
+</style>
 
-    fc1, fc2, fc3 = st.columns(3)
-    with fc1:
-        sel_대분류 = st.selectbox("대분류", ["전체"] + unique_vals(df_raw, col_대분류))
-    with fc2:
-        df_f = df_raw if sel_대분류 == "전체" else df_raw[df_raw[col_대분류] == sel_대분류]
-        sel_중분류 = st.selectbox("중분류", ["전체"] + unique_vals(df_f, col_중분류))
-    with fc3:
-        df_f2 = df_raw
-        if sel_대분류 != "전체" and col_대분류:
-            df_f2 = df_f2[df_f2[col_대분류] == sel_대분류]
-        if sel_중분류 != "전체" and col_중분류:
-            df_f2 = df_f2[df_f2[col_중분류] == sel_중분류]
-        sel_소분류 = st.selectbox("소분류", ["전체"] + unique_vals(df_f2, col_소분류))
+<div id="photo-fixed-panel">
+  <h4>📷 상품 사진</h4>
+  <div id="panel-img-wrap">
+    <div id="panel-noimg">사진을 클릭하면<br>여기에 표시됩니다</div>
+    <img id="panel-img" src="" style="display:none"
+      onclick="document.getElementById('zoom-modal-outer').style.display='flex';
+               document.getElementById('zoom-img-outer').src=this.src;"
+      onerror="this.style.display='none';document.getElementById('panel-noimg').style.display='block'"/>
+  </div>
+  <div id="panel-pno"></div>
+  <div id="panel-pname"></div>
+</div>
 
-    fc4, fc5, fc6 = st.columns(3)
-    with fc4:
-        sel_담당 = st.selectbox("담당자", ["전체"] + unique_vals(df_raw, col_담당))
-    with fc5:
-        sel_관계사팀 = st.selectbox("관계사팀", ["전체"] + unique_vals(df_raw, col_관계사팀))
-    with fc6:
-        sel_업체 = st.selectbox("업체", ["전체"] + unique_vals(df_raw, col_업체명))
+<!-- 확대 모달 (패널 이미지 클릭용) -->
+<div id="zoom-modal-outer" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;"
+  onclick="if(event.target===this)this.style.display='none'">
+  <span onclick="document.getElementById('zoom-modal-outer').style.display='none'"
+    style="position:fixed;top:16px;right:16px;color:#fff;font-size:28px;cursor:pointer;
+    background:rgba(0,0,0,0.5);border-radius:50%;width:48px;height:48px;
+    display:flex;align-items:center;justify-content:center;">✕</span>
+  <img id="zoom-img-outer" src="" style="max-width:90%;max-height:85%;object-fit:contain;
+    border-radius:4px;box-shadow:0 0 30px rgba(0,0,0,0.5)"/>
+</div>
+"""
 
-    _, btn_col, _ = st.columns([3, 1, 3])
-    with btn_col:
-        do_search = st.button("🔍 조회", use_container_width=True)
+st.markdown(PHOTO_PANEL_CSS, unsafe_allow_html=True)
 
-with photo_col:
-    # 사진 패널 - components.html로 JS와 연동
-    st.markdown("""
-        <div id="photo-panel">
-          <h4>📷 상품 사진</h4>
-          <div class="noimg" id="panel-noimg">사진 위에 마우스를 올리면<br>여기에 표시됩니다</div>
-          <div id="panel-pno" class="pno" style="display:none"></div>
-          <div id="panel-pname" class="pname" style="display:none"></div>
-          <img id="panel-img" src="" style="display:none"
-            onclick="zoomImg(this.src)"
-            onerror="this.style.display='none';document.getElementById('panel-noimg').style.display='block'"/>
-        </div>
-    """, unsafe_allow_html=True)
+# ─── 필터 UI ────────────────────────────────────────────────────
+sel_품번검색 = st.text_input("🔎 품번 검색", placeholder="품번 입력 (부분 검색 가능)")
+
+fc1, fc2, fc3 = st.columns(3)
+with fc1:
+    sel_대분류 = st.selectbox("대분류", ["전체"] + unique_vals(df_raw, col_대분류))
+with fc2:
+    df_f = df_raw if sel_대분류 == "전체" else df_raw[df_raw[col_대분류] == sel_대분류]
+    sel_중분류 = st.selectbox("중분류", ["전체"] + unique_vals(df_f, col_중분류))
+with fc3:
+    df_f2 = df_raw
+    if sel_대분류 != "전체" and col_대분류:
+        df_f2 = df_f2[df_f2[col_대분류] == sel_대분류]
+    if sel_중분류 != "전체" and col_중분류:
+        df_f2 = df_f2[df_f2[col_중분류] == sel_중분류]
+    sel_소분류 = st.selectbox("소분류", ["전체"] + unique_vals(df_f2, col_소분류))
+
+fc4, fc5, fc6 = st.columns(3)
+with fc4:
+    sel_담당 = st.selectbox("담당자", ["전체"] + unique_vals(df_raw, col_담당))
+with fc5:
+    sel_관계사팀 = st.selectbox("관계사팀", ["전체"] + unique_vals(df_raw, col_관계사팀))
+with fc6:
+    sel_업체 = st.selectbox("업체", ["전체"] + unique_vals(df_raw, col_업체명))
+
+_, btn_col, _ = st.columns([3, 1, 3])
+with btn_col:
+    do_search = st.button("🔍 조회", use_container_width=True)
 
 st.markdown("---")
 
@@ -483,8 +542,9 @@ if df.empty:
 table_body = build_table(df, sel_months, col_map)
 
 SCRIPTS = """
-<!-- 확대 모달 -->
-<div id="zoom-modal">
+<!-- 테이블 내 확대 모달 -->
+<div id="zoom-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;">
   <span class="close-btn" ontouchend="closeZoom()" onclick="closeZoom()">✕</span>
   <img id="zoom-img" src=""/>
 </div>
@@ -492,66 +552,52 @@ SCRIPTS = """
 <script>
 var lastTap = 0;
 
-// 사진 탭/클릭 핸들러 (첫번째 탭 = 패널 업데이트, 두번째 탭 = 확대)
 function handleImgClick(e, url, pno, pname) {
   e.preventDefault();
   var now = Date.now();
-  var isPanelShown = (document.getElementById('zoom-modal').style.display !== 'flex');
-
   // 패널 업데이트 (항상)
-  showPanel(url, pno, pname);
-
-  // 더블탭이거나 데스크탑 클릭이면 확대
-  var timeDiff = now - lastTap;
-  if (timeDiff < 400 && timeDiff > 0) {
+  updatePanel(url, pno, pname);
+  // 더블탭이면 확대
+  if ((now - lastTap) < 400 && (now - lastTap) > 0) {
     zoomImg(url);
   }
   lastTap = now;
 }
 
-// 사진 패널 업데이트
-function showPanel(url, pno, pname) {
+// window.parent DOM 조작으로 Streamlit 페이지의 패널 업데이트
+function updatePanel(url, pno, pname) {
   try {
-    var panel = window.parent.document.getElementById('panel-img');
-    var noimg = window.parent.document.getElementById('panel-noimg');
-    var pnoEl = window.parent.document.getElementById('panel-pno');
-    var pnameEl = window.parent.document.getElementById('panel-pname');
-    if (panel && url && url.startsWith('http')) {
-      panel.src = url;
-      panel.style.display = 'block';
+    var doc = window.parent.document;
+    var img = doc.getElementById('panel-img');
+    var noimg = doc.getElementById('panel-noimg');
+    var pnoEl = doc.getElementById('panel-pno');
+    var pnameEl = doc.getElementById('panel-pname');
+    if (img && url && url.startsWith('http')) {
+      img.src = url;
+      img.style.display = 'block';
       noimg.style.display = 'none';
-      pnoEl.innerText = pno;
-      pnoEl.style.display = 'block';
-      pnameEl.innerText = pname;
-      pnameEl.style.display = 'block';
+      if (pnoEl) pnoEl.innerText = pno;
+      if (pnameEl) pnameEl.innerText = pname;
     }
   } catch(e) {}
 }
 
-// 확대 모달 열기
 function zoomImg(url) {
   if (!url || !url.startsWith('http')) return;
   document.getElementById('zoom-img').src = url;
-  var modal = document.getElementById('zoom-modal');
-  modal.style.display = 'flex';
+  document.getElementById('zoom-modal').style.display = 'flex';
 }
 
-// 모달 닫기 - 배경 탭 or ✕ 버튼
 function closeZoom() {
   document.getElementById('zoom-modal').style.display = 'none';
 }
 
-// 모달 배경 탭하면 닫기
 document.getElementById('zoom-modal').addEventListener('touchend', function(e) {
-  if (e.target === this || e.target === document.getElementById('zoom-img')) {
-    closeZoom();
-  }
+  if (e.target === this || e.target === document.getElementById('zoom-img')) closeZoom();
 });
 document.getElementById('zoom-modal').addEventListener('click', function(e) {
   if (e.target === this) closeZoom();
 });
-
-// ESC 키 (데스크탑)
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') closeZoom();
 });
