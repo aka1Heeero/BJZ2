@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import streamlit.components.v1 as components
 
 st.set_page_config(
     page_title="BJZ2",
@@ -7,7 +8,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-import streamlit.components.v1 as components
 
 # ─── 로그인 ────────────────────────────────────────────────────
 def check_password():
@@ -27,76 +27,44 @@ def check_password():
             else:
                 st.error("비밀번호가 틀렸습니다.")
     return False
- 
+
 if not check_password():
     st.stop()
- 
-# ─── CSS ───────────────────────────────────────────────────────
+
+# ─── CSS (st.markdown용 - 필터/버튼 스타일) ────────────────────
 st.markdown("""
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
   html, body, [class*="css"] { font-family: 'Noto Sans KR', sans-serif; font-size: 12px; }
   .stApp { background: #f5f5f5; }
-  .page-header { display:flex; align-items:center; gap:8px; padding:8px 16px; margin-bottom:12px; }
-  .page-header .dot { color:#e53e3e; font-size:18px; }
-  .page-header h1 { font-size:1.1rem; font-weight:700; margin:0; color:#1a1a1a; }
   div.stButton > button { background:#1a3a5c; color:white; border:none; border-radius:4px; padding:6px 24px; font-weight:600; font-size:13px; }
   div.stButton > button:hover { background:#2d6a9f; }
-  .tbl-wrap { overflow-x:auto; margin-top:6px; }
-  table.main-tbl { border-collapse:collapse; width:100%; font-size:11px; border:1px solid #999; }
-  table.main-tbl th { background:#dce6f1; color:#1a1a1a; font-weight:600; padding:5px 6px; border:1px solid #bbb; text-align:center; white-space:nowrap; position:sticky; top:0; z-index:2; }
-  table.main-tbl td { padding:3px 5px; border:1px solid #ccc; white-space:nowrap; font-size:11px; color:#333; }
-  table.main-tbl td.num { text-align:right; }
-  table.main-tbl td.center { text-align:center; }
-  table.main-tbl td.left { text-align:left; }
-  table.main-tbl tr.prod-first td { border-top:2px solid #666; }
-  table.main-tbl tr.row-pos td { background:#ffe0e0; }
-  table.main-tbl tr.row-pos td.type-label { background:#ffcccc; color:#c00; font-weight:700; }
-  table.main-tbl td.type-label { text-align:center; font-weight:500; background:#f8f8f8; min-width:55px; }
-  table.main-tbl td.zero-val { color:#ccc; }
-  table.main-tbl tr.owner-row td { background:#f0f4f8; font-size:10px; color:#555; font-weight:500; border-top:1px dashed #bbb; }
-  table.main-tbl td.img-cell { text-align:center; vertical-align:middle; padding:3px; background:#fff; }
-  table.main-tbl td.img-cell img { width:60px; height:60px; object-fit:contain; border:1px solid #e0e0e0; border-radius:3px; background:#fff; display:block; margin:auto; }
-  table.main-tbl th.img-th { min-width:68px; }
-  .st-badge { display:inline-block; padding:1px 5px; border-radius:2px; font-size:10px; font-weight:600; }
-  .st-badge.신상품 { background:#d4edda; color:#155724; }
-  .st-badge.단종대기 { background:#f8d7da; color:#721c24; }
-  .st-badge.진행 { background:#e2e3e5; color:#383d41; }
-  .st-badge.기타 { background:#fff3cd; color:#856404; }
   .stSelectbox > div > div { font-size:12px !important; }
   div[data-testid="stStatusWidget"] { display:none; }
-  @media (max-width:1024px) { table.main-tbl th, table.main-tbl td { padding:2px 3px; font-size:10px; } }
 </style>
 """, unsafe_allow_html=True)
- 
- 
-# ─── xlsx 파일 로드 ──────────────────────────────────────────────
+
+# ─── xlsx 파일 로드 ─────────────────────────────────────────────
 DATA_FILE = "BJZ.xlsx"
- 
+
 @st.cache_data
 def load_data():
-    """
-    행0 = 카테고리 (구분, S/N단가, 발주, 입고, 출고, POS판매, 물류재고, 매장재고, 보유매장, 미입고)
-    행1 = 세부컬럼명
-    행2~ = 데이터
-    월 형식: YY/MM (예: 26/11)
-    """
     try:
         raw = pd.read_excel(DATA_FILE, header=None, dtype=str, sheet_name=0)
         if len(raw) < 3:
             return pd.DataFrame()
- 
+
         row0 = [str(v).strip() if pd.notna(v) and str(v) != "nan" else ""
                 for v in raw.iloc[0]]
         row1 = [str(v).strip().replace("\n", " ") if pd.notna(v) and str(v) != "nan" else ""
                 for v in raw.iloc[1]]
- 
+
         max_cols = raw.shape[1]
         while len(row0) < max_cols:
             row0.append("")
         while len(row1) < max_cols:
             row1.append("")
- 
+
         columns = []
         last_cat = ""
         for i in range(max_cols):
@@ -104,41 +72,39 @@ def load_data():
             sub = row1[i]
             if cat and cat not in ("nan", ""):
                 last_cat = cat
- 
-            # YY/MM 패턴 감지 (예: 26/11)
+
             is_month = (len(sub) == 5 and sub[2] == "/" and
                         sub[:2].isdigit() and sub[3:].isdigit())
- 
+
             if is_month and last_cat and last_cat not in ("구분", ""):
                 col_name = f"{last_cat}_{sub}"
             else:
                 col_name = sub if sub else f"_col_{i}"
- 
+
             base = col_name
             n = 2
             while col_name in columns:
                 col_name = f"{base}_{n}"
                 n += 1
             columns.append(col_name)
- 
+
         df = pd.DataFrame(raw.iloc[2:].values, columns=columns)
         df = df.astype(str).replace("nan", "").replace("<NA>", "")
- 
+
         if "품번" in df.columns:
             df = df[df["품번"].str.strip() != ""]
         return df.reset_index(drop=True)
- 
+
     except FileNotFoundError:
         st.error(f"파일을 찾을 수 없습니다: {DATA_FILE}")
         return pd.DataFrame()
     except Exception as e:
         st.error(f"데이터 로드 오류: {e}")
         return pd.DataFrame()
- 
- 
-# ─── 유틸 함수 ───────────────────────────────────────────────────
+
+# ─── 유틸 함수 ──────────────────────────────────────────────────
 ROW_TYPES = ["발주", "입고", "출고", "POS판매", "물류재고", "매장재고", "보유매장", "미입고"]
- 
+
 def detect_months(df):
     found = set()
     for c in df.columns:
@@ -149,7 +115,7 @@ def detect_months(df):
                 if len(m) == 5 and m[2] == "/" and m[:2].isdigit() and m[3:].isdigit():
                     found.add(m)
     return sorted(found)
- 
+
 def get_col(df, *names):
     df_cols = list(df.columns)
     for name in names:
@@ -171,7 +137,7 @@ def get_col(df, *names):
             if name in c:
                 return c
     return None
- 
+
 def safe_int(v):
     try:
         if v in ("", None, "nan", "<NA>"):
@@ -179,18 +145,48 @@ def safe_int(v):
         return int(float(str(v).replace(",", "")))
     except:
         return 0
- 
+
 def fmt_num(v):
     return "0" if v == 0 else f"{v:,}"
- 
+
 def unique_vals(df, col):
     if col is None:
         return []
     return sorted([v for v in df[col].unique()
                    if str(v).strip() and str(v) not in ("nan", "<NA>", "")])
- 
- 
-# ─── 테이블 HTML 생성 ────────────────────────────────────────────
+
+# ─── 테이블 HTML 생성 ───────────────────────────────────────────
+TABLE_CSS = """
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+  * { font-family: 'Noto Sans KR', sans-serif; box-sizing: border-box; }
+  body { margin: 0; padding: 0; background: #f5f5f5; }
+  .tbl-wrap { overflow-x:auto; margin-top:6px; }
+  table.main-tbl { border-collapse:collapse; width:100%; font-size:11px; border:1px solid #999; }
+  table.main-tbl th { background:#dce6f1; color:#1a1a1a; font-weight:600; padding:5px 6px; border:1px solid #bbb; text-align:center; white-space:nowrap; position:sticky; top:0; z-index:2; }
+  table.main-tbl td { padding:3px 5px; border:1px solid #ccc; white-space:nowrap; font-size:11px; color:#333; }
+  table.main-tbl td.num { text-align:right; }
+  table.main-tbl td.center { text-align:center; }
+  table.main-tbl td.left { text-align:left; }
+  table.main-tbl tr.prod-first td { border-top:2px solid #666; }
+  table.main-tbl tr.row-pos td { background:#ffe0e0; }
+  table.main-tbl tr.row-pos td.type-label { background:#ffcccc; color:#c00; font-weight:700; }
+  table.main-tbl td.type-label { text-align:center; font-weight:500; background:#f8f8f8; min-width:55px; }
+  table.main-tbl td.zero-val { color:#ccc; }
+  table.main-tbl tr.owner-row td { background:#f0f4f8; font-size:10px; color:#555; font-weight:500; border-top:1px dashed #bbb; }
+  table.main-tbl td.img-cell { text-align:center; vertical-align:middle; padding:3px; background:#fff; }
+  table.main-tbl td.img-cell img { width:60px; height:60px; object-fit:contain; border:1px solid #e0e0e0; border-radius:3px; background:#fff; display:block; margin:auto; }
+  table.main-tbl th.img-th { min-width:68px; }
+  .st-badge { display:inline-block; padding:1px 5px; border-radius:2px; font-size:10px; font-weight:600; }
+  .st-badge.신상품 { background:#d4edda; color:#155724; }
+  .st-badge.단종대기 { background:#f8d7da; color:#721c24; }
+  .st-badge.진행 { background:#e2e3e5; color:#383d41; }
+  .st-badge.기타 { background:#fff3cd; color:#856404; }
+  tr.clickable-row { cursor: pointer; }
+  tr.clickable-row:hover td { background:#fffde7 !important; }
+</style>
+"""
+
 def build_table(df, months, cm):
     month_ths = "".join(
         f'<th rowspan="2" style="min-width:44px;text-align:center">{m}</th>'
@@ -214,13 +210,13 @@ def build_table(df, months, cm):
         <th style="min-width:40px">통화</th>
         <th style="min-width:50px">금액</th>
     </tr></thead>"""
- 
+
     badge_map = {"신상품": "신상품", "단종대기": "단종대기", "진행": "진행"}
     rs      = len(ROW_TYPES)
     parts   = []
     df_cols = set(df.columns)
     mc      = {rt: [f"{rt}_{m}" for m in months] for rt in ROW_TYPES}
- 
+
     for idx in range(len(df)):
         row = df.iloc[idx]
         품명     = str(row[cm["품명"]]) if cm["품명"] else ""
@@ -235,16 +231,19 @@ def build_table(df, months, cm):
         sn_통화  = str(row[cm["SN통화"]]) if cm["SN통화"] else ""
         sn_금액  = safe_int(row[cm["SN금액"]]) if cm["SN금액"] else 0
         사진주소 = str(row[cm["사진주소"]]).strip() if cm["사진주소"] else ""
- 
+
         badge_cls = badge_map.get(상태, "기타")
         seq = idx + 1
- 
+
         if 사진주소.startswith("http"):
             img_html = (f'<img src="{사진주소}" '
                         f'onerror="this.style.display=\'none\'" alt="{품번}"/>')
         else:
             img_html = '<span style="color:#ccc;font-size:18px">📷</span>'
- 
+
+        # 행 클릭 시 사진 팝업
+        click_js = f"onclick=\"showPhoto('{사진주소}', '{품번}', '{품명[:20]}')\""
+
         first_cells = (
             f'<td class="center" rowspan="{rs}">{seq}</td>'
             f'<td class="img-cell" rowspan="{rs}">{img_html}</td>'
@@ -261,31 +260,30 @@ def build_table(df, months, cm):
             f'<td class="num" rowspan="{rs}">{fmt_num(미입고_v)}</td>'
             f'<td class="left" rowspan="{rs}" style="font-size:10px">{입고예정}</td>'
         )
- 
+
         for ri, rt in enumerate(ROW_TYPES):
             is_first = ri == 0
             is_pos   = rt == "POS판매"
-            tr_cls   = ""
+            tr_cls   = "clickable-row"
             if is_first and is_pos:
-                tr_cls = ' class="prod-first row-pos"'
+                tr_cls += " prod-first row-pos"
             elif is_first:
-                tr_cls = ' class="prod-first"'
+                tr_cls += " prod-first"
             elif is_pos:
-                tr_cls = ' class="row-pos"'
- 
+                tr_cls += " row-pos"
+
             cells = []
             if is_first:
                 cells.append(first_cells)
             cells.append(f'<td class="type-label">{rt}</td>')
- 
+
             for col_name in mc[rt]:
                 v = safe_int(row[col_name]) if col_name in df_cols else 0
                 cells.append('<td class="num zero-val">0</td>' if v == 0
                              else f'<td class="num">{v:,}</td>')
- 
-            parts.append(f"<tr{tr_cls}>{''.join(cells)}</tr>")
- 
-        # 구입가 요약 행
+
+            parts.append(f'<tr class="{tr_cls}" {click_js}>{"".join(cells)}</tr>')
+
         empty_tds = '<td></td>' * len(months)
         parts.append(
             f'<tr class="owner-row"><td></td><td></td><td></td><td></td>'
@@ -295,28 +293,29 @@ def build_table(df, months, cm):
             f'<td class="num">{fmt_num(미입고_v)}</td>'
             f'<td></td><td></td>{empty_tds}</tr>'
         )
- 
+
     return (f'<div class="tbl-wrap">'
             f'<table class="main-tbl">{header}'
             f'<tbody>{"".join(parts)}</tbody>'
             f'</table></div>')
- 
- 
-# ─── 헤더 ───────────────────────────────────────────────────────
+
+# ─── 헤더 ──────────────────────────────────────────────────────
 st.markdown(
-    '<div class="page-header"><span class="dot">●</span>'
-    '<h1>발주관리표2</h1></div>',
+    '<div style="display:flex;align-items:center;gap:8px;padding:8px 16px;margin-bottom:12px">'
+    '<span style="color:#e53e3e;font-size:18px">●</span>'
+    '<h1 style="font-size:1.1rem;font-weight:700;margin:0;color:#1a1a1a">발주관리표2</h1>'
+    '</div>',
     unsafe_allow_html=True)
- 
-# ─── 데이터 로드 ─────────────────────────────────────────────────
+
+# ─── 데이터 로드 ────────────────────────────────────────────────
 with st.spinner("데이터 불러오는 중..."):
     df_raw = load_data()
- 
+
 if df_raw.empty:
     st.warning("데이터가 없습니다. BJZ.xlsx 파일을 확인해주세요.")
     st.stop()
- 
-# ─── 컬럼명 파악 ─────────────────────────────────────────────────
+
+# ─── 컬럼명 파악 ────────────────────────────────────────────────
 col_담당     = get_col(df_raw, "담당")
 col_대분류   = get_col(df_raw, "대분류")
 col_중분류   = get_col(df_raw, "중분류")
@@ -335,7 +334,7 @@ col_미입고   = get_col(df_raw, "미입고")
 col_입고예정 = get_col(df_raw, "입고예정")
 col_SN통화   = get_col(df_raw, "통화")
 col_SN금액   = get_col(df_raw, "금액")
- 
+
 col_map = {
     "품명": col_품명,     "품번": col_품번,     "상태": col_상태,
     "판매가": col_판매가, "구입가": col_구입가,
@@ -344,73 +343,38 @@ col_map = {
     "SN통화": col_SN통화, "SN금액": col_SN금액,
     "사진주소": col_사진주소,
 }
- 
-# ─── 레이아웃: 필터(왼쪽) + 사진(오른쪽) ──────────────────────
-filter_col, photo_col = st.columns([4, 1])
- 
-with filter_col:
-    sel_품번검색 = st.text_input("🔎 품번 검색", placeholder="품번 입력 (부분 검색 가능)")
- 
-    fc1, fc2, fc3 = st.columns(3)
-    with fc1:
-        sel_대분류 = st.selectbox("대분류", ["전체"] + unique_vals(df_raw, col_대분류))
-    with fc2:
-        df_f = df_raw if sel_대분류 == "전체" else df_raw[df_raw[col_대분류] == sel_대분류]
-        sel_중분류 = st.selectbox("중분류", ["전체"] + unique_vals(df_f, col_중분류))
-    with fc3:
-        df_f2 = df_raw
-        if sel_대분류 != "전체" and col_대분류:
-            df_f2 = df_f2[df_f2[col_대분류] == sel_대분류]
-        if sel_중분류 != "전체" and col_중분류:
-            df_f2 = df_f2[df_f2[col_중분류] == sel_중분류]
-        sel_소분류 = st.selectbox("소분류", ["전체"] + unique_vals(df_f2, col_소분류))
- 
-    fc4, fc5, fc6 = st.columns(3)
-    with fc4:
-        sel_담당 = st.selectbox("담당자", ["전체"] + unique_vals(df_raw, col_담당))
-    with fc5:
-        sel_관계사팀 = st.selectbox("관계사팀", ["전체"] + unique_vals(df_raw, col_관계사팀))
-    with fc6:
-        sel_업체 = st.selectbox("업체", ["전체"] + unique_vals(df_raw, col_업체명))
- 
-    _, btn_col, _ = st.columns([3, 1, 3])
-    with btn_col:
-        do_search = st.button("🔍 조회", use_container_width=True)
- 
-# ─── 사진 패널 (필터 오른쪽) ────────────────────────────────────
-with photo_col:
-    st.markdown("#### 📷 상품 사진")
- 
-    if "filtered_df" in st.session_state and col_품번 and col_사진주소:
-        df_cur   = st.session_state["filtered_df"]
-        if len(df_cur) > 0:
-            품번_list = df_cur[col_품번].tolist()
-            품명_list = (df_cur[col_품명].tolist() if col_품명
-                         else [""] * len(품번_list))
-            sel_opts  = [f"{p} | {str(n)[:15]}"
-                         for p, n in zip(품번_list, 품명_list)]
- 
-            sel_idx = st.selectbox("품번 선택", range(len(sel_opts)),
-                                   format_func=lambda i: sel_opts[i],
-                                   key="photo_select")
-            사진url = str(df_cur.iloc[sel_idx][col_사진주소]).strip()
-            st.markdown(f"**{품번_list[sel_idx]}**")
-            st.caption(str(품명_list[sel_idx])[:30])
-            if 사진url.startswith("http"):
-                st.image(사진url, use_container_width=True)
-            else:
-                st.markdown(
-                    '<div style="color:#aaa;text-align:center;padding:16px">'
-                    '사진 없음</div>', unsafe_allow_html=True)
-    else:
-        st.markdown(
-            '<div style="color:#aaa;text-align:center;padding:20px;'
-            'border:1px dashed #ddd;border-radius:6px;font-size:11px">'
-            '조회 후<br>품번을 선택하면<br>사진이 표시됩니다</div>',
-            unsafe_allow_html=True)
- 
+
+# ─── 필터 UI ────────────────────────────────────────────────────
+sel_품번검색 = st.text_input("🔎 품번 검색", placeholder="품번 입력 (부분 검색 가능)")
+
+fc1, fc2, fc3 = st.columns(3)
+with fc1:
+    sel_대분류 = st.selectbox("대분류", ["전체"] + unique_vals(df_raw, col_대분류))
+with fc2:
+    df_f = df_raw if sel_대분류 == "전체" else df_raw[df_raw[col_대분류] == sel_대분류]
+    sel_중분류 = st.selectbox("중분류", ["전체"] + unique_vals(df_f, col_중분류))
+with fc3:
+    df_f2 = df_raw
+    if sel_대분류 != "전체" and col_대분류:
+        df_f2 = df_f2[df_f2[col_대분류] == sel_대분류]
+    if sel_중분류 != "전체" and col_중분류:
+        df_f2 = df_f2[df_f2[col_중분류] == sel_중분류]
+    sel_소분류 = st.selectbox("소분류", ["전체"] + unique_vals(df_f2, col_소분류))
+
+fc4, fc5, fc6 = st.columns(3)
+with fc4:
+    sel_담당 = st.selectbox("담당자", ["전체"] + unique_vals(df_raw, col_담당))
+with fc5:
+    sel_관계사팀 = st.selectbox("관계사팀", ["전체"] + unique_vals(df_raw, col_관계사팀))
+with fc6:
+    sel_업체 = st.selectbox("업체", ["전체"] + unique_vals(df_raw, col_업체명))
+
+_, btn_col, _ = st.columns([3, 1, 3])
+with btn_col:
+    do_search = st.button("🔍 조회", use_container_width=True)
+
 st.markdown("---")
- 
+
 # ─── 필터 적용 ──────────────────────────────────────────────────
 if do_search:
     df = df_raw.copy()
@@ -431,20 +395,64 @@ if do_search:
     df = df.reset_index(drop=True)
     st.session_state["filtered_df"] = df
     st.rerun()
- 
+
 if "filtered_df" not in st.session_state:
     st.info("필터를 선택한 후 🔍 조회 버튼을 눌러주세요.")
     st.stop()
- 
-df        = st.session_state["filtered_df"]
+
+df = st.session_state["filtered_df"]
 sel_months = detect_months(df_raw)
- 
+
 st.markdown(f"**조회 결과: 총 {len(df)}개 상품**")
- 
+
 if df.empty:
     st.info("조회 결과가 없습니다.")
     st.stop()
- 
-# ─── 테이블 렌더링 ──────────────────────────────────────────────
-table_html = build_table(df, sel_months, col_map)
-st.markdown(table_html, unsafe_allow_html=True)
+
+# ─── 테이블 렌더링 (components.html 사용) ───────────────────────
+table_body = build_table(df, sel_months, col_map)
+
+# 행 클릭 시 사진 팝업 JavaScript
+popup_js = """
+<div id="photo-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:8px;padding:20px;max-width:400px;width:90%;
+    position:relative;text-align:center;">
+    <button onclick="closeModal()" style="position:absolute;top:8px;right:12px;
+      border:none;background:none;font-size:20px;cursor:pointer;">✕</button>
+    <div id="modal-pno" style="font-family:monospace;font-size:13px;color:#555;margin-bottom:4px"></div>
+    <div id="modal-pname" style="font-size:12px;color:#333;margin-bottom:12px"></div>
+    <img id="modal-img" src="" style="max-width:100%;max-height:300px;object-fit:contain;
+      border:1px solid #eee;border-radius:4px;" onerror="this.style.display='none'"/>
+    <div id="modal-noimg" style="display:none;color:#aaa;padding:40px;font-size:13px">사진 없음</div>
+  </div>
+</div>
+<script>
+function showPhoto(url, pno, pname) {
+  document.getElementById('modal-pno').innerText = pno;
+  document.getElementById('modal-pname').innerText = pname;
+  var img = document.getElementById('modal-img');
+  var noimg = document.getElementById('modal-noimg');
+  if (url && url.startsWith('http')) {
+    img.src = url;
+    img.style.display = 'block';
+    noimg.style.display = 'none';
+  } else {
+    img.style.display = 'none';
+    noimg.style.display = 'block';
+  }
+  document.getElementById('photo-modal').style.display = 'flex';
+}
+function closeModal() {
+  document.getElementById('photo-modal').style.display = 'none';
+}
+</script>
+"""
+
+full_html = TABLE_CSS + popup_js + table_body
+
+# 행 수에 따라 높이 동적 계산 (최소 400, 최대 2000)
+row_count = len(df)
+height = min(max(400, row_count * 80), 2000)
+
+components.html(full_html, height=height, scrolling=True)
