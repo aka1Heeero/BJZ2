@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
- 
+
 # ─── 페이지 설정 ───────────────────────────────────────────────
 st.set_page_config(
     page_title="BJZ2",
@@ -8,7 +8,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
- 
+
+# 추가: HTML 렌더링 허용
+st.config.set_option("server.enableXsrfProtection", False)
 # ─── 로그인 ────────────────────────────────────────────────────
 def check_password():
     if "authenticated" not in st.session_state:
