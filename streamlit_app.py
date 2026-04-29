@@ -1,13 +1,14 @@
 import streamlit as st
 import pandas as pd
 
-# ─── 페이지 설정 ───────────────────────────────────────────────
 st.set_page_config(
     page_title="BJZ2",
     page_icon="📦",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+import streamlit.components.v1 as components
+
 # ─── 로그인 ────────────────────────────────────────────────────
 def check_password():
     if "authenticated" not in st.session_state:
