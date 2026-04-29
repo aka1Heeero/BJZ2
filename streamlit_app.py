@@ -36,11 +36,11 @@ if not check_password():
 st.markdown("""
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
-  html, body, [class*="css"] { font-family: 'Noto Sans KR', sans-serif; font-size: 12px; }
+  html, body, [class*="css"] { font-family: 'Noto Sans KR', sans-serif; font-size: 12px; /* 전체 기본 폰트, 크기조정 */ }
   .stApp { background: #f5f5f5; }
-  div.stButton > button { background:#1a3a5c; color:white; border:none; border-radius:4px; padding:6px 24px; font-weight:600; font-size:13px; }
+  div.stButton > button { background:#1a3a5c; color:white; border:none; border-radius:4px; padding:6px 24px; font-weight:600; font-size:13px; /* 조회버튼, 크기조정 */ }
   div.stButton > button:hover { background:#2d6a9f; }
-  .stSelectbox > div > div { font-size:12px !important; }
+  .stSelectbox > div > div { font-size:12px !important; /* 필터 셀렉트박스, 크기조정 */ }
   div[data-testid="stStatusWidget"] { display:none; }
 </style>
 """, unsafe_allow_html=True)
@@ -186,32 +186,33 @@ TABLE_CSS = """
     position: relative;
   }
 
-  table.main-tbl { border-collapse:collapse; width:100%; font-size:11px; border:1px solid #999; }
+  table.main-tbl { border-collapse:collapse; width:100%; font-size:11px; /* 테이블 전체 셀, 크기조정 */ border:1px solid #999; }
 
   /* ② sticky header */
   table.main-tbl thead th {
     background:#dce6f1; color:#1a1a1a; font-weight:600;
     padding:5px 6px; border:1px solid #bbb; text-align:center;
     white-space:nowrap; position:sticky; z-index:10;
+    /* 테이블 헤더(컬럼명), 크기조정: font-size 추가 시 여기에 작성 */
   }
   /* 2행 헤더: 1행은 top:0, 2행은 1행 높이(27px) 아래 */
   table.main-tbl thead tr:nth-child(1) th { top: 0; }
   table.main-tbl thead tr:nth-child(2) th { top: 27px; }
 
-  table.main-tbl td { padding:3px 5px; border:1px solid #ccc; white-space:nowrap; font-size:11px; color:#333; }
+  table.main-tbl td { padding:3px 5px; border:1px solid #ccc; white-space:nowrap; font-size:11px; /* 테이블 데이터 셀, 크기조정 */ color:#333; }
   table.main-tbl td.num { text-align:right; }
   table.main-tbl td.center { text-align:center; }
   table.main-tbl td.left { text-align:left; }
   table.main-tbl tr.prod-first td { border-top:2px solid #666; }
   table.main-tbl tr.row-pos td { background:#ffe0e0; }
   table.main-tbl tr.row-pos td.type-label { background:#ffcccc; color:#c00; font-weight:700; }
-  table.main-tbl td.type-label { text-align:center; font-weight:500; background:#f8f8f8; min-width:55px; }
+  table.main-tbl td.type-label { text-align:center; font-weight:500; background:#f8f8f8; min-width:55px; /* 구분(발주/입고 등) 라벨, 크기조정 */ }
   table.main-tbl td.zero-val { color:#ccc; }
   table.main-tbl td.img-cell { text-align:center; vertical-align:middle; padding:3px; background:#fff; cursor:pointer; }
-  table.main-tbl td.img-cell img { width:60px; height:60px; object-fit:contain; border:1px solid #e0e0e0; border-radius:3px; background:#fff; display:block; margin:auto; transition:transform 0.1s; }
+  table.main-tbl td.img-cell img { width:60px; height:60px; /* 테이블 썸네일 이미지 크기, 크기조정 */ object-fit:contain; border:1px solid #e0e0e0; border-radius:3px; background:#fff; display:block; margin:auto; transition:transform 0.1s; }
   table.main-tbl td.img-cell img:hover { transform:scale(1.1); border-color:#1a3a5c; }
   table.main-tbl th.img-th { min-width:68px; }
-  .st-badge { display:inline-block; padding:1px 5px; border-radius:2px; font-size:10px; font-weight:600; }
+  .st-badge { display:inline-block; padding:1px 5px; border-radius:2px; font-size:10px; /* 상태 뱃지(진행/신상품 등), 크기조정 */ font-weight:600; }
   .st-badge.신상품 { background:#d4edda; color:#155724; }
   .st-badge.단종대기 { background:#f8d7da; color:#721c24; }
   .st-badge.진행 { background:#e2e3e5; color:#383d41; }
@@ -248,7 +249,7 @@ def build_table(df, months, cm):
         <th rowspan="2" class="img-th">사진</th>
         <th rowspan="2" style="min-width:65px">상태</th>
         <th rowspan="2" style="min-width:80px">품번</th>
-        <th rowspan="2" style="min-width:160px">품명</th>
+        <th rowspan="2" style="min-width:100px">품명</th>
         <th rowspan="2" style="min-width:52px">판매가</th>
         <th colspan="2" style="text-align:center">S/N단가</th>
         <th rowspan="2" style="min-width:48px">가용재고</th>
@@ -340,8 +341,8 @@ def build_table(df, months, cm):
 # ─── 헤더 ──────────────────────────────────────────────────────
 st.markdown(
     '<div style="display:flex;align-items:center;gap:8px;padding:8px 16px;margin-bottom:12px">'
-    '<span style="color:#e53e3e;font-size:18px">●</span>'
-    '<h1 style="font-size:1.1rem;font-weight:700;margin:0;color:#1a1a1a">발주관리표2</h1>'
+    '<span style="color:#e53e3e;font-size:22px">●</span>'
+    '<h1 style="font-size:1.6rem;/* 제목, 크기조정 */ font-weight:700;margin:0;color:#1a1a1a">BJG2</h1>'
     '</div>',
     unsafe_allow_html=True)
 
@@ -356,6 +357,7 @@ if df_raw.empty:
 # ─── 컬럼명 파악 ────────────────────────────────────────────────
 col_담당     = get_col(df_raw, "담당")
 col_중분류   = get_col(df_raw, "중분류")
+col_소분류   = get_col(df_raw, "소분류")
 col_품명     = get_col(df_raw, "품명")
 col_품번     = get_col(df_raw, "품번")
 col_상태     = get_col(df_raw, "상태")
@@ -391,17 +393,17 @@ PHOTO_PANEL_HTML = """
     display:flex; flex-direction:column; align-items:center;
     box-shadow:0 1px 6px rgba(0,0,0,0.09);
   }
-  h4 { font-size:11px; color:#1a3a5c; font-weight:600; margin-bottom:5px; }
+  h4 { font-size:11px; /* 사진패널 제목(📷 상품 사진), 크기조정 */ color:#1a3a5c; font-weight:600; margin-bottom:5px; }
   #panel-img-wrap {
-    width:145px; height:145px; flex-shrink:0;
+    width:145px; height:145px; /* 사진패널 이미지 박스 크기, 크기조정 */ flex-shrink:0;
     display:flex; align-items:center; justify-content:center;
     border:1px solid #eee; border-radius:4px;
     background:#fafafa; overflow:hidden;
   }
-  #panel-img-wrap img { max-width:145px; max-height:145px; object-fit:contain; cursor:pointer; }
-  #panel-noimg { color:#bbb; font-size:11px; text-align:center; line-height:1.6; }
-  #panel-pno   { font-family:monospace; font-size:10px; color:#666; margin-top:3px; }
-  #panel-pname { font-size:10px; color:#333; text-align:center;
+  #panel-img-wrap img { max-width:145px; max-height:145px; /* 사진패널 이미지 최대크기, 크기조정 */ object-fit:contain; cursor:pointer; }
+  #panel-noimg { color:#bbb; font-size:11px; /* 사진패널 안내문구, 크기조정 */ text-align:center; line-height:1.6; }
+  #panel-pno   { font-family:monospace; font-size:10px; /* 사진패널 품번, 크기조정 */ color:#666; margin-top:3px; }
+  #panel-pname { font-size:10px; /* 사진패널 품명, 크기조정 */ color:#333; text-align:center;
                  max-width:145px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 </style>
 <div id="panel-wrap">
@@ -452,18 +454,20 @@ with filter_col:
     with r1c1:
         sel_품번검색 = st.text_input("🔎 품번 검색", placeholder="품번 입력 (부분 검색)")
     with r1c2:
-        # ① 대분류 → 진행상태 필터로 교체
         sel_진행상태 = st.selectbox("진행상태", ["전체", "진행", "신상품", "단종대기"])
     with r1c3:
         sel_중분류 = st.selectbox("중분류", ["전체"] + unique_vals(df_raw, col_중분류))
 
     r2c1, r2c2, r2c3 = st.columns(3)
     with r2c1:
-        sel_담당 = st.selectbox("담당자", ["전체"] + unique_vals(df_raw, col_담당))
+        sel_소분류 = st.selectbox("소분류", ["전체"] + unique_vals(df_raw, col_소분류))
     with r2c2:
-        sel_업체 = st.selectbox("업체", ["전체"] + unique_vals(df_raw, col_업체명))
+        sel_담당 = st.selectbox("담당자", ["전체"] + unique_vals(df_raw, col_담당))
     with r2c3:
-        st.markdown("<div style='height:27px'></div>", unsafe_allow_html=True)
+        sel_업체 = st.selectbox("업체", ["전체"] + unique_vals(df_raw, col_업체명))
+
+    _, btn_c, _ = st.columns([2, 1, 2])
+    with btn_c:
         do_search = st.button("🔍 조회", use_container_width=True)
 
 with photo_col:
@@ -481,6 +485,8 @@ if do_search:
         df = df[df[col_상태] == sel_진행상태]
     if sel_중분류 != "전체" and col_중분류:
         df = df[df[col_중분류] == sel_중분류]
+    if sel_소분류 != "전체" and col_소분류:
+        df = df[df[col_소분류] == sel_소분류]
     if sel_담당 != "전체" and col_담당:
         df = df[df[col_담당] == sel_담당]
     if sel_업체 != "전체" and col_업체명:
