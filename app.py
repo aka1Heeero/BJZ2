@@ -3,7 +3,7 @@ import pandas as pd
  
 # ─── 페이지 설정 ───────────────────────────────────────────────
 st.set_page_config(
-    page_title="발주관리표2",
+    page_title="BJZ2",
     page_icon="📦",
     layout="wide",
     initial_sidebar_state="collapsed",
