@@ -223,11 +223,16 @@ TABLE_CSS = """
     background:rgba(0,0,0,0.85); z-index:9999;
     align-items:center; justify-content:center;
   }
-  #zoom-modal img { max-width:90%; max-height:90%; object-fit:contain;
+  #zoom-modal img { max-width:90%; max-height:85%; object-fit:contain;
     border-radius:4px; box-shadow:0 0 30px rgba(0,0,0,0.5); }
   #zoom-modal .close-btn {
-    position:fixed; top:20px; right:30px; color:#fff;
-    font-size:36px; cursor:pointer; line-height:1;
+    position:fixed; top:16px; right:16px; color:#fff;
+    font-size:28px; cursor:pointer; line-height:1;
+    background:rgba(0,0,0,0.5); border-radius:50%;
+    width:48px; height:48px; display:flex;
+    align-items:center; justify-content:center;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
 </style>
 """
@@ -287,7 +292,7 @@ def build_table(df, months, cm):
         if 사진주소.startswith("http"):
             img_html = (
                 f'<img src="{사진주소}" '
-                f'onclick="zoomImg(\'{safe_url}\')" '
+                f'onclick="handleImgClick(event, \'{safe_url}\',\'{품번}\',\'{safe_품명[:20]}\')" '
                 f'onmouseover="showPanel(\'{safe_url}\',\'{품번}\',\'{safe_품명[:20]}\')" '
                 f'onerror="this.style.display=\'none\'" alt="{품번}"/>'
             )
@@ -479,13 +484,32 @@ table_body = build_table(df, sel_months, col_map)
 
 SCRIPTS = """
 <!-- 확대 모달 -->
-<div id="zoom-modal" onclick="closeZoom()">
-  <span class="close-btn">✕</span>
-  <img id="zoom-img" src="" onclick="event.stopPropagation()"/>
+<div id="zoom-modal">
+  <span class="close-btn" ontouchend="closeZoom()" onclick="closeZoom()">✕</span>
+  <img id="zoom-img" src=""/>
 </div>
 
 <script>
-// 사진 패널 업데이트 (마우스오버)
+var lastTap = 0;
+
+// 사진 탭/클릭 핸들러 (첫번째 탭 = 패널 업데이트, 두번째 탭 = 확대)
+function handleImgClick(e, url, pno, pname) {
+  e.preventDefault();
+  var now = Date.now();
+  var isPanelShown = (document.getElementById('zoom-modal').style.display !== 'flex');
+
+  // 패널 업데이트 (항상)
+  showPanel(url, pno, pname);
+
+  // 더블탭이거나 데스크탑 클릭이면 확대
+  var timeDiff = now - lastTap;
+  if (timeDiff < 400 && timeDiff > 0) {
+    zoomImg(url);
+  }
+  lastTap = now;
+}
+
+// 사진 패널 업데이트
 function showPanel(url, pno, pname) {
   try {
     var panel = window.parent.document.getElementById('panel-img');
@@ -504,15 +528,30 @@ function showPanel(url, pno, pname) {
   } catch(e) {}
 }
 
-// 확대 모달
+// 확대 모달 열기
 function zoomImg(url) {
   if (!url || !url.startsWith('http')) return;
   document.getElementById('zoom-img').src = url;
-  document.getElementById('zoom-modal').style.display = 'flex';
+  var modal = document.getElementById('zoom-modal');
+  modal.style.display = 'flex';
 }
+
+// 모달 닫기 - 배경 탭 or ✕ 버튼
 function closeZoom() {
   document.getElementById('zoom-modal').style.display = 'none';
 }
+
+// 모달 배경 탭하면 닫기
+document.getElementById('zoom-modal').addEventListener('touchend', function(e) {
+  if (e.target === this || e.target === document.getElementById('zoom-img')) {
+    closeZoom();
+  }
+});
+document.getElementById('zoom-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeZoom();
+});
+
+// ESC 키 (데스크탑)
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') closeZoom();
 });
