@@ -280,7 +280,7 @@ def build_table(df, months, cm):
         정상재고 = safe_int(row[cm["정상재고"]]) if cm["정상재고"] else 0
         일출고   = safe_int(row[cm["일출고량"]]) if cm["일출고량"] else 0
         sn_통화  = str(row[cm["SN통화"]]) if cm["SN통화"] else ""
-        sn_금액  = safe_int(row[cm["SN금액"]]) if cm["SN금액"] else 0
+        sn_금액 = float(row[cm["SN금액"]]) if cm["SN금액"] else 0.0
         사진주소 = str(row[cm["사진주소"]]).strip() if cm["사진주소"] else ""
 
         badge_cls = badge_map.get(상태, "기타")
