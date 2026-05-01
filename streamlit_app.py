@@ -161,7 +161,13 @@ def safe_int(v):
         return int(float(str(v).replace(",", "")))
     except:
         return 0
-
+        
+def safe_float(val): 
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return 0.0
+        
 def fmt_num(v):
     return "0" if v == 0 else f"{v:,}"
 
@@ -280,7 +286,7 @@ def build_table(df, months, cm):
         정상재고 = safe_int(row[cm["정상재고"]]) if cm["정상재고"] else 0
         일출고   = safe_int(row[cm["일출고량"]]) if cm["일출고량"] else 0
         sn_통화  = str(row[cm["SN통화"]]) if cm["SN통화"] else ""
-        sn_금액 = safe_int(row[cm["SN금액"]]) if cm["SN금액"] else 0
+        sn_금액 = safe_float(row[cm["SN금액"]]) if cm["SN금액"] else 0.0
         사진주소 = str(row[cm["사진주소"]]).strip() if cm["사진주소"] else ""
 
         badge_cls = badge_map.get(상태, "기타")
